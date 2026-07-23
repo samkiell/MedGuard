@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { createHolonClient } from "@ontomorph/holon-client";
 
 export const MOCK_MEDICATIONS = [
-  { id: "mock-1", name: "Warfarin", code: "11289", dosage: "5 mg daily", date: "2026-07-20" },
-  { id: "mock-2", name: "Aspirin", code: "1191", dosage: "81 mg daily", date: "2026-07-21" },
-  { id: "mock-3", name: "Simvastatin", code: "36567", dosage: "20 mg daily", date: "2026-07-22" },
-  { id: "mock-4", name: "Clarithromycin", code: "21212", dosage: "500 mg twice daily", date: "2026-07-23" },
+  { id: "mock-1", name: "Phenytoin", code: "8183", dosage: "100 mg thrice daily", date: "2026-07-20" },
+  { id: "mock-2", name: "Delavirdine", code: "83816", dosage: "400 mg thrice daily", date: "2026-07-21" },
+  { id: "mock-3", name: "Warfarin", code: "11289", dosage: "5 mg daily", date: "2026-07-22" },
+  { id: "mock-4", name: "Aspirin", code: "1191", dosage: "81 mg daily", date: "2026-07-23" },
 ];
 
 export interface PlainLanguageInteraction {
@@ -47,16 +47,49 @@ export async function POST(req: Request) {
 
     let rawInteractions: any[] = [];
     let conceptDetailsMap: Record<string, any> = {};
+    const codeToConceptIdMap: Record<string, number> = {};
+    const conceptIdToCodeMap: Record<number, string> = {};
 
     if (apiKey) {
       try {
-        const apiUrl = process.env.HOLON_API_URL;
-        const client = createHolonClient(apiUrl ? ({ apiKey, apiUrl } as any) : ({ apiKey } as any));
+        const apiUrl = process.env.HOLON_API_URL || "https://holon-api.ontomorph.com";
+        const client = createHolonClient({ apiKey, apiUrl } as any);
         
-        // Step 1: interactions.checkList
-        console.log("[HOLON Step 1] Calling client.interactions.checkList with drugCodes:", drugCodes);
-        const numericIds = drugCodes.map((c) => parseInt(c, 10)).filter((n) => !isNaN(n));
-        const res: any = await client.interactions.checkList(numericIds as any).catch((err: any) => {
+        // Step 1: Resolve conceptId and ancestors for each RxNorm code FIRST
+        const holonConceptIds: number[] = [];
+
+        for (const code of drugCodes) {
+          try {
+            console.log(`[HOLON Concept Resolution] Resolving concept & ancestors for RxNorm code: ${code}`);
+            const conceptRes = await client.concepts.getByCode(code, "RxNorm").catch(() => null);
+            const conceptObj = conceptRes?.concept;
+            const cid = conceptObj?.conceptId;
+
+            if (cid) {
+              holonConceptIds.push(cid);
+              codeToConceptIdMap[code] = cid;
+              conceptIdToCodeMap[cid] = code;
+            }
+
+            const rawNum = parseInt(code, 10);
+            const ancestors = cid
+              ? await client.concepts.getAncestors(cid).catch(() => null)
+              : !isNaN(rawNum)
+              ? await client.concepts.getAncestors(rawNum).catch(() => null)
+              : null;
+
+            conceptDetailsMap[code] = { concept: conceptRes, ancestors };
+          } catch (cErr: any) {
+            console.warn(`[HOLON Concept Resolution Error - ${code}]:`, cErr?.message || cErr);
+          }
+        }
+
+        // Include both resolved conceptIds AND numeric RxNorm codes to query checkList
+        const rawNumericCodes = drugCodes.map((c) => parseInt(c, 10)).filter((n) => !isNaN(n));
+        const idsToQuery = Array.from(new Set([...holonConceptIds, ...rawNumericCodes]));
+
+        console.log("[HOLON Step 1] Calling client.interactions.checkList with query IDs:", idsToQuery);
+        const res: any = await client.interactions.checkList(idsToQuery).catch((err: any) => {
           console.warn("[HOLON checkList warning]:", err?.message || err);
           return null;
         });
@@ -67,21 +100,6 @@ export async function POST(req: Request) {
         } else if (res && res.pairs) {
           rawInteractions = res.pairs.flatMap((p: any) => p.interactions || []);
         }
-
-        // Step 2: concepts.getByCode & concepts.getAncestors resolution
-        for (const code of drugCodes) {
-          try {
-            console.log(`[HOLON Step 2] Resolving concept & ancestors for RxNorm code: ${code}`);
-            const concept = await client.concepts.getByCode(code, "RxNorm").catch(() => null);
-            const numId = parseInt(code, 10);
-            const ancestors = !isNaN(numId) ? await client.concepts.getAncestors(numId).catch(() => null) : null;
-            console.log(`[HOLON Step 2 Output - ${code}] Concept:`, JSON.stringify(concept, null, 2));
-            console.log(`[HOLON Step 2 Output - ${code}] Ancestors:`, JSON.stringify(ancestors, null, 2));
-            conceptDetailsMap[code] = { concept, ancestors };
-          } catch (cErr: any) {
-            console.warn(`[HOLON Step 2 Error - ${code}]:`, cErr?.message || cErr);
-          }
-        }
       } catch (clientErr: any) {
         console.warn("[HOLON API Client Error]:", clientErr.message);
       }
@@ -89,22 +107,19 @@ export async function POST(req: Request) {
       console.warn("[API /api/interactions/check] HOLON_KEY not present in environment variables.");
     }
 
-    // Step 3: Process interactions into plain-language explanations
+    // Step 2: Process interactions into plain-language explanations
     let processedInteractions: PlainLanguageInteraction[] = [];
 
     if (rawInteractions.length > 0) {
       processedInteractions = rawInteractions.map((item: any) => {
-        const pair0 = String(item.drugAConceptId || item.pair?.[0] || drugCodes[0]);
-        const pair1 = String(item.drugBConceptId || item.pair?.[1] || drugCodes[1]);
+        const codeA = item.drugACode || String(item.drugAConceptId || item.pair?.[0]);
+        const codeB = item.drugBCode || String(item.drugBConceptId || item.pair?.[1]);
 
-        const med1 = medications.find((m) => m.code === pair0)?.name || item.drugAName || pair0;
-        const med2 = medications.find((m) => m.code === pair1)?.name || item.drugBName || pair1;
+        const med1 = medications.find((m) => m.code === codeA || codeToConceptIdMap[m.code] === item.drugAConceptId)?.name || item.drugAName || codeA;
+        const med2 = medications.find((m) => m.code === codeB || codeToConceptIdMap[m.code] === item.drugBConceptId)?.name || item.drugBName || codeB;
         
-        const concept1Obj = conceptDetailsMap[pair0]?.concept?.concept;
-        const concept2Obj = conceptDetailsMap[pair1]?.concept?.concept;
-
-        const ancestors1Obj = conceptDetailsMap[pair0]?.ancestors?.ancestors || [];
-        const ancestors2Obj = conceptDetailsMap[pair1]?.ancestors?.ancestors || [];
+        const ancestors1Obj = conceptDetailsMap[codeA]?.ancestors?.ancestors || [];
+        const ancestors2Obj = conceptDetailsMap[codeB]?.ancestors?.ancestors || [];
 
         const ancestors1 = ancestors1Obj.map((a: any) => a.conceptName || a.name);
         const ancestors2 = ancestors2Obj.map((a: any) => a.conceptName || a.name);
@@ -121,9 +136,9 @@ export async function POST(req: Request) {
         }
 
         return {
-          pair: [pair0, pair1],
+          pair: [codeA, codeB],
           drugNames: [med1, med2],
-          severity: (item.severity || "moderate").toLowerCase() as any,
+          severity: item.severity === "contraindicated" ? "high" : ((item.severity || "moderate").toLowerCase() as any),
           description: desc || "Interaction detected.",
           plainLanguageExplanation: explanation,
           mechanismOrAncestors: [...ancestors1, ...ancestors2],
@@ -131,7 +146,7 @@ export async function POST(req: Request) {
       });
     }
 
-    console.log("[HOLON Step 3 Output] Final Processed Plain-Language Interactions:", JSON.stringify(processedInteractions, null, 2));
+    console.log("[HOLON Step 2 Output] Final Processed Plain-Language Interactions:", JSON.stringify(processedInteractions, null, 2));
 
     return NextResponse.json({
       success: true,
