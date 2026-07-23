@@ -21,6 +21,7 @@ export async function GET() {
       const twinsRes = await fetch(`${baseUrl}/twins?environment=test`, {
         headers: {
           "X-DTP-API-Key": platformKey,
+          Authorization: `Bearer ${platformKey}`,
           Accept: "application/json",
         },
       });
@@ -35,6 +36,7 @@ export async function GET() {
             method: "POST",
             headers: {
               "X-DTP-API-Key": platformKey,
+              Authorization: `Bearer ${platformKey}`,
               "Content-Type": "application/json",
               Accept: "application/json",
             },
@@ -48,6 +50,7 @@ export async function GET() {
           method: "POST",
           headers: {
             "X-DTP-API-Key": platformKey,
+            Authorization: `Bearer ${platformKey}`,
             "Content-Type": "application/json",
             Accept: "application/json",
           },
@@ -66,6 +69,7 @@ export async function GET() {
       method: "POST",
       headers: {
         "X-DTP-API-Key": platformKey,
+        Authorization: `Bearer ${platformKey}`,
         "Content-Type": "application/json",
         Accept: "application/json",
       },
@@ -74,6 +78,7 @@ export async function GET() {
         scopes: ["grants:write", "twins:read", "twins:write", "events:read", "events:write"],
       }),
     });
+
 
     const grantBody = await grantRes.json().catch(() => null);
 
