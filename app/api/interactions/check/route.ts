@@ -42,11 +42,20 @@ export async function POST(req: Request) {
         
         // Step 1: Resolve conceptId and ancestors for each RxNorm code FIRST
         const holonConceptIds: number[] = [];
+        const resolutionErrors: { code: string; reason: string }[] = [];
 
         for (const code of drugCodes) {
           try {
             console.log(`[HOLON Concept Resolution] Resolving concept & ancestors for RxNorm code: ${code}`);
-            const conceptRes = await client.concepts.getByCode(code, "RxNorm").catch(() => null);
+            let conceptRes: any = null;
+            let getByCodeError: any = null;
+
+            try {
+              conceptRes = await client.concepts.getByCode(code, "RxNorm");
+            } catch (err: any) {
+              getByCodeError = err;
+            }
+
             const conceptObj = conceptRes?.concept;
             const cid = conceptObj?.conceptId;
 
@@ -54,36 +63,39 @@ export async function POST(req: Request) {
               holonConceptIds.push(cid);
               codeToConceptIdMap[code] = cid;
               conceptIdToCodeMap[cid] = code;
+
+              const ancestors = await client.concepts.getAncestors(cid).catch(() => null);
+              conceptDetailsMap[code] = { concept: conceptRes, ancestors };
+            } else {
+              const reason = getByCodeError?.message || (conceptRes ? "conceptId missing in concept response" : "getByCode returned null/undefined");
+              console.error(`[HOLON Concept Resolution Failed] RxNorm code '${code}' failed to resolve to conceptId. Reason: ${reason}`);
+              resolutionErrors.push({ code, reason });
             }
-
-            const rawNum = parseInt(code, 10);
-            const ancestors = cid
-              ? await client.concepts.getAncestors(cid).catch(() => null)
-              : !isNaN(rawNum)
-              ? await client.concepts.getAncestors(rawNum).catch(() => null)
-              : null;
-
-            conceptDetailsMap[code] = { concept: conceptRes, ancestors };
           } catch (cErr: any) {
-            console.warn(`[HOLON Concept Resolution Error - ${code}]:`, cErr?.message || cErr);
+            const reason = cErr?.message || String(cErr);
+            console.error(`[HOLON Concept Resolution Error] RxNorm code '${code}' failed to resolve. Reason: ${reason}`);
+            resolutionErrors.push({ code, reason });
           }
         }
 
-        // Include both resolved conceptIds AND numeric RxNorm codes to query checkList
-        const rawNumericCodes = drugCodes.map((c) => parseInt(c, 10)).filter((n) => !isNaN(n));
-        const idsToQuery = Array.from(new Set([...holonConceptIds, ...rawNumericCodes]));
+        if (resolutionErrors.length > 0) {
+          console.error(`[HOLON checkList Aborted] ${resolutionErrors.length} RxNorm code(s) failed to resolve:`, resolutionErrors);
+        } else {
+          // Pass ONLY the array of resolved conceptIds into checkList(), never raw RxNorm codes
+          const conceptIdsToQuery = holonConceptIds;
+          console.log("[HOLON Step 1] Calling client.interactions.checkList with clean conceptIds:", conceptIdsToQuery);
 
-        console.log("[HOLON Step 1] Calling client.interactions.checkList with query IDs:", idsToQuery);
-        const res: any = await client.interactions.checkList(idsToQuery).catch((err: any) => {
-          console.warn("[HOLON checkList warning]:", err?.message || err);
-          return null;
-        });
-        console.log("[HOLON Step 1 Output] Raw interactions returned from HOLON:", JSON.stringify(res, null, 2));
+          const res: any = await client.interactions.checkList(conceptIdsToQuery).catch((err: any) => {
+            console.warn("[HOLON checkList warning]:", err?.message || err);
+            return null;
+          });
+          console.log("[HOLON Step 1 Output] Raw interactions returned from HOLON:", JSON.stringify(res, null, 2));
 
-        if (res && res.interactions) {
-          rawInteractions = res.interactions;
-        } else if (res && res.pairs) {
-          rawInteractions = res.pairs.flatMap((p: any) => p.interactions || []);
+          if (res && res.interactions) {
+            rawInteractions = res.interactions;
+          } else if (res && res.pairs) {
+            rawInteractions = res.pairs.flatMap((p: any) => p.interactions || []);
+          }
         }
       } catch (clientErr: any) {
         console.warn("[HOLON API Client Error]:", clientErr.message);
