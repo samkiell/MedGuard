@@ -13,7 +13,7 @@ interface Medication {
 interface PlainLanguageInteraction {
   pair: [string, string];
   drugNames: [string, string];
-  severity: "high" | "moderate" | "low" | "unknown";
+  severity: "high" | "moderate" | "low" | "unknown" | "severe" | "mild";
   description: string;
   plainLanguageExplanation: string;
   mechanismOrAncestors?: string[];
@@ -26,12 +26,16 @@ export default function Home() {
   const [medications, setMedications] = useState<Medication[]>([]);
   const [interactions, setInteractions] = useState<PlainLanguageInteraction[]>([]);
   
+  // Track expanded state for interaction cards
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
   // Track flagged items status
   const [flagStatus, setFlagStatus] = useState<Record<string, { loading: boolean; success: boolean; message?: string }>>({});
 
   // Form state for adding custom/sandbox drug
   const [customName, setCustomName] = useState("");
   const [customCode, setCustomCode] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const runInteractionCheck = async (medsList: Medication[]) => {
     if (medsList.length < 2) {
@@ -46,8 +50,14 @@ export default function Home() {
         body: JSON.stringify({ medications: medsList }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.interactions)) {
         setInteractions(data.interactions);
+        // Default expand all cards for live demonstration scanability
+        const initialExpanded: Record<string, boolean> = {};
+        data.interactions.forEach((item: PlainLanguageInteraction) => {
+          initialExpanded[`${item.pair[0]}-${item.pair[1]}`] = true;
+        });
+        setExpandedCards(initialExpanded);
       }
     } catch (err: any) {
       console.error("Interaction check failed:", err);
@@ -70,11 +80,9 @@ export default function Home() {
         setError(data.error);
       }
       setMedications(meds);
-      // Run interaction check with twin meds or let backend USE_MOCK_MEDS handle it
       runInteractionCheck(meds);
     } catch (err: any) {
       setError(err.message);
-      // Even on error reading twin, trigger check in case USE_MOCK_MEDS is enabled on backend
       runInteractionCheck([]);
     } finally {
       setLoadingMeds(false);
@@ -132,6 +140,7 @@ export default function Home() {
     runInteractionCheck(updated);
     setCustomName("");
     setCustomCode("");
+    setShowAddForm(false);
   };
 
   const removeMedication = (id: string) => {
@@ -140,275 +149,354 @@ export default function Home() {
     runInteractionCheck(updated);
   };
 
-  const getSeverityBadge = (severity: string) => {
-    switch (severity) {
-      case "high":
-        return "bg-rose-500/10 text-rose-400 border-rose-500/30";
-      case "moderate":
-        return "bg-amber-500/10 text-amber-400 border-amber-500/30";
-      case "low":
-        return "bg-yellow-500/10 text-yellow-400 border-yellow-500/30";
-      default:
-        return "bg-slate-500/10 text-slate-400 border-slate-500/30";
+  const toggleExpand = (key: string) => {
+    setExpandedCards((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Helper for 3-tier severity color system
+  const getSeverityTier = (severity: string) => {
+    const s = severity.toLowerCase();
+    if (s === "high" || s === "severe") {
+      return {
+        label: "Severe Risk",
+        barColor: "bg-[#F87171]",
+        badgeBg: "bg-[#F87171]/15",
+        badgeText: "text-[#FCA5A5]",
+        badgeBorder: "border-[#F87171]/30",
+      };
+    } else if (s === "moderate") {
+      return {
+        label: "Moderate Risk",
+        barColor: "bg-[#FB923C]",
+        badgeBg: "bg-[#FB923C]/15",
+        badgeText: "text-[#FDBA74]",
+        badgeBorder: "border-[#FB923C]/30",
+      };
+    } else {
+      return {
+        label: "Mild Risk",
+        barColor: "bg-[#FACC15]",
+        badgeBg: "bg-[#FACC15]/15",
+        badgeText: "text-[#FDE047]",
+        badgeBorder: "border-[#FACC15]/30",
+      };
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white">
-      {/* Top Navigation Bar */}
-      <header className="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[#0F172A] text-[#F8FAFC] font-sans antialiased pb-16">
+      {/* Top Clinical Header */}
+      <header className="border-b border-[#28354D] bg-[#162032]/80 backdrop-blur-md sticky top-0 z-20">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
+            <div className="h-8 w-8 rounded-lg bg-[#1E293B] border border-[#28354D] flex items-center justify-center text-[#2DD4BF] font-semibold text-sm">
               🛡️
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-100 tracking-tight">Polypharmacy Guardian</h1>
-              <p className="text-xs text-slate-400">AI Safety & Interaction Monitor for Ontomorph Digital Twins</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold text-[#F8FAFC] tracking-tight">MedGuard</h1>
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-[#1E293B] text-[#94A3B8] border border-[#28354D]">
+                  Clinical Portal
+                </span>
+              </div>
+              <p className="text-xs text-[#94A3B8]">Polypharmacy & Drug Safety Monitoring</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              Digital Twin Connected
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-[#1E293B] border border-[#28354D] text-xs font-medium text-[#94A3B8]">
+              <span className="h-2 w-2 rounded-full bg-[#2DD4BF]" />
+              HOLON Knowledge Graph Active
+            </div>
+            <button
+              onClick={fetchMedications}
+              className="px-3 py-1.5 bg-[#1E293B] hover:bg-[#26334D] text-[#F8FAFC] text-xs font-medium rounded-lg border border-[#28354D] transition flex items-center gap-1.5"
+              aria-label="Refresh twin medication data"
+            >
+              <svg className="w-3.5 h-3.5 text-[#94A3B8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Sync Twin Data
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content Dashboard */}
-      <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-        {/* Patient / Twin Summary Bar */}
-        <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm flex flex-wrap items-center justify-between gap-4 backdrop-blur-sm">
+      {/* Main Single Vertical Flow Container */}
+      <main className="max-w-5xl mx-auto px-6 pt-8 space-y-8">
+        {/* 1. Patient / Twin Identity Banner */}
+        <section className="bg-[#162032] border border-[#28354D] rounded-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider text-indigo-400 font-semibold">Active Twin Context</span>
-              <span className="text-xs text-slate-500">|</span>
-              <span className="text-xs font-mono text-slate-400">ID: TWIN-OM-89421</span>
+            <div className="flex items-center gap-2 text-xs text-[#94A3B8]">
+              <span className="font-semibold uppercase tracking-wider text-[#38BDF8]">Patient Twin Context</span>
+              <span>•</span>
+              <span className="font-mono text-[#F8FAFC]">TWIN-OM-89421</span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-100">Patient Polypharmacy Safety Portal</h2>
+            <h2 className="text-xl font-bold text-[#F8FAFC]">Digital Twin Safety Profile</h2>
           </div>
 
-          <div className="flex items-center gap-4 text-sm text-slate-300">
-            <div className="bg-slate-950/60 px-4 py-2 rounded-xl border border-slate-800">
-              <span className="text-slate-400 block text-xs">Active Meds</span>
-              <span className="font-bold text-slate-100 text-base">{medications.length}</span>
+          <div className="flex items-center gap-4 text-xs">
+            <div className="bg-[#0F172A] px-3.5 py-2 rounded-lg border border-[#28354D]">
+              <span className="text-[#94A3B8] block text-[11px] uppercase tracking-wider">Active Regimen</span>
+              <span className="font-bold text-[#F8FAFC] text-base">{medications.length} Prescriptions</span>
             </div>
-            <div className="bg-slate-950/60 px-4 py-2 rounded-xl border border-slate-800">
-              <span className="text-slate-400 block text-xs">Flagged Risks</span>
-              <span className="font-bold text-rose-400 text-base">{interactions.length}</span>
+            <div className="bg-[#0F172A] px-3.5 py-2 rounded-lg border border-[#28354D]">
+              <span className="text-[#94A3B8] block text-[11px] uppercase tracking-wider">Flagged Interactions</span>
+              <span className="font-bold text-[#FB923C] text-base">{interactions.length} Findings</span>
             </div>
-            <button
-              onClick={fetchMedications}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium border border-slate-700 transition"
-            >
-              🔄 Refresh Twin Data
-            </button>
           </div>
         </section>
 
+        {/* Global Error Banner */}
         {error && (
-          <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-sm flex items-center gap-2">
-            <span>⚠️</span> {error}
+          <div className="p-4 bg-[#F87171]/10 border border-[#F87171]/30 rounded-xl text-[#FCA5A5] text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm">⚠️</span>
+              <span>Clinical Sync Notice: {error}</span>
+            </div>
+            <button
+              onClick={fetchMedications}
+              className="px-2.5 py-1 bg-[#1E293B] hover:bg-[#26334D] text-[#F8FAFC] text-xs rounded border border-[#28354D] transition"
+            >
+              Retry
+            </button>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Active Medications & Add Form */}
-          <div className="space-y-6">
-            <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm space-y-4">
-              <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-                <span>💊</span> Active Prescriptions
-              </h3>
-
-              {loadingMeds ? (
-                <div className="py-8 text-center text-slate-400 text-sm animate-pulse">
-                  Syncing twin medication list...
-                </div>
-              ) : medications.length === 0 ? (
-                <div className="py-6 text-center text-slate-500 text-sm">
-                  No active prescriptions detected.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {medications.map((med) => (
-                    <div
-                      key={med.id}
-                      className="p-3.5 bg-slate-950/80 border border-slate-800/80 rounded-xl flex items-center justify-between gap-3 hover:border-slate-700 transition group"
-                    >
-                      <div>
-                        <p className="font-semibold text-slate-200 text-sm">{med.name}</p>
-                        <p className="text-xs font-mono text-slate-500">RxNorm: {med.code}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs px-2 py-1 bg-slate-800 text-slate-400 rounded-md">
-                          {med.dosage || "Active"}
-                        </span>
-                        <button
-                          onClick={() => removeMedication(med.id)}
-                          className="text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition px-1 text-xs"
-                          title="Remove prescription"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* Quick Add Prescription Card */}
-            <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm space-y-3">
-              <h4 className="text-sm font-semibold text-slate-300">Add Prescription to Twin Profile</h4>
-              <form onSubmit={handleAddCustomMed} className="space-y-3">
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Drug Name (e.g. Lisinopril)"
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="text"
-                    placeholder="RxNorm Code (e.g. 29046)"
-                    value={customCode}
-                    onChange={(e) => setCustomCode(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-indigo-600/20"
-                >
-                  Add & Cross-Check Risk
-                </button>
-              </form>
-            </section>
+        {/* 2. Active Medication Regimen (Clean Scannable List) */}
+        <section className="bg-[#162032] border border-[#28354D] rounded-xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-[#28354D] pb-3">
+            <div>
+              <h3 className="text-base font-bold text-[#F8FAFC]">Active Medication Regimen</h3>
+              <p className="text-xs text-[#94A3B8]">Current patient prescriptions cross-checked for interactions</p>
+            </div>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="px-3 py-1.5 bg-[#1E293B] hover:bg-[#26334D] text-[#F8FAFC] text-xs font-semibold rounded-lg border border-[#28354D] transition flex items-center gap-1"
+            >
+              {showAddForm ? "Cancel" : "+ Add Prescription"}
+            </button>
           </div>
 
-          {/* Right Column: Interaction Check & Flag Findings */}
-          <div className="lg:col-span-2 space-y-6">
-            <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-sm space-y-5">
-              <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800/80 pb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-                    <span>🚨</span> HOLON Risk Findings & Explanations
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Clinical knowledge graph analysis cross-checked against active twin prescriptions
-                  </p>
-                </div>
-                {checkingInteractions && (
-                  <span className="text-xs text-indigo-400 font-medium animate-pulse bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
-                    Running HOLON Clinical Graph Check...
-                  </span>
-                )}
+          {/* Add Prescription Drawer Form */}
+          {showAddForm && (
+            <form onSubmit={handleAddCustomMed} className="p-4 bg-[#0F172A] border border-[#28354D] rounded-xl space-y-3">
+              <div className="text-xs font-semibold text-[#F8FAFC]">Add Medication to Current Regimen</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="Drug Name (e.g. Lisinopril)"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  className="px-3 py-2 bg-[#1E293B] border border-[#28354D] rounded-lg text-xs text-[#F8FAFC] placeholder-[#64748B] focus:outline-none"
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="RxNorm Code (e.g. 29046)"
+                  value={customCode}
+                  onChange={(e) => setCustomCode(e.target.value)}
+                  className="px-3 py-2 bg-[#1E293B] border border-[#28354D] rounded-lg text-xs text-[#F8FAFC] placeholder-[#64748B] focus:outline-none"
+                  required
+                />
               </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#2DD4BF] hover:bg-[#26B2A1] text-[#0F172A] text-xs font-bold rounded-lg transition"
+                >
+                  Add & Check Interactions
+                </button>
+              </div>
+            </form>
+          )}
 
-              {checkingInteractions ? (
-                <div className="py-12 text-center text-slate-400 text-sm space-y-2">
-                  <div className="h-6 w-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p>Cross-referencing medication concepts & mechanisms...</p>
-                </div>
-              ) : interactions.length === 0 ? (
-                <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-sm flex items-center gap-3">
-                  <span className="text-2xl">✓</span>
-                  <div>
-                    <strong className="block text-emerald-300 font-semibold">No Interactions Flagged</strong>
-                    <p className="text-xs text-emerald-400/80 mt-0.5">
-                      All active prescriptions cross-checked cleanly with no known high or moderate risk combinations.
-                    </p>
+          {/* Scannable Medication List */}
+          {loadingMeds ? (
+            <div className="py-6 space-y-2">
+              <div className="h-10 bg-[#0F172A] rounded-lg animate-pulse border border-[#28354D]" />
+              <div className="h-10 bg-[#0F172A] rounded-lg animate-pulse border border-[#28354D]" />
+            </div>
+          ) : medications.length === 0 ? (
+            <div className="py-6 text-center text-[#94A3B8] text-xs border border-dashed border-[#28354D] rounded-lg">
+              No active prescriptions loaded in twin context.
+            </div>
+          ) : (
+            <div className="divide-y divide-[#28354D]/60 border border-[#28354D] rounded-lg overflow-hidden bg-[#0F172A]">
+              {medications.map((med) => (
+                <div
+                  key={med.id}
+                  className="px-4 py-3 flex items-center justify-between gap-4 hover:bg-[#1E293B]/50 transition group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-[#94A3B8] text-xs font-mono">💊</span>
+                    <div className="truncate">
+                      <span className="text-sm font-semibold text-[#F8FAFC]">{med.name}</span>
+                      <span className="text-xs text-[#94A3B8] ml-2">RxNorm: {med.code}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs px-2.5 py-0.5 bg-[#1E293B] text-[#94A3B8] rounded border border-[#28354D] font-mono">
+                      {med.dosage || "Active"}
+                    </span>
+                    <button
+                      onClick={() => removeMedication(med.id)}
+                      className="text-[#64748B] hover:text-[#F87171] opacity-0 group-hover:opacity-100 transition px-1 text-xs"
+                      title="Remove prescription"
+                      aria-label={`Remove ${med.name}`}
+                    >
+                      ✕
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {interactions.map((item, idx) => {
-                    const key = `${item.pair[0]}-${item.pair[1]}`;
-                    const status = flagStatus[key];
+              ))}
+            </div>
+          )}
+        </section>
 
-                    return (
-                      <div
-                        key={idx}
-                        className="p-5 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-4 shadow-sm hover:border-slate-700 transition"
-                      >
-                        <div className="flex items-start justify-between flex-wrap gap-3">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-lg font-bold text-slate-100">
-                                {item.drugNames[0]} + {item.drugNames[1]}
-                              </h4>
-                            </div>
-                            <p className="text-xs font-mono text-slate-500">
-                              RxNorm Pair: {item.pair[0]} & {item.pair[1]}
-                            </p>
+        {/* 3. Clinical Risk Findings (Signature Expandable Card Flow) */}
+        <section className="bg-[#162032] border border-[#28354D] rounded-xl p-6 shadow-sm space-y-5">
+          <div className="flex items-center justify-between border-b border-[#28354D] pb-4">
+            <div>
+              <h3 className="text-base font-bold text-[#F8FAFC]">Clinical Interaction Findings</h3>
+              <p className="text-xs text-[#94A3B8]">Cross-referenced against active digital twin prescriptions</p>
+            </div>
+            {checkingInteractions && (
+              <span className="text-xs text-[#38BDF8] font-medium bg-[#38BDF8]/10 px-3 py-1 rounded-full border border-[#38BDF8]/20 animate-pulse">
+                Analyzing HOLON Graph...
+              </span>
+            )}
+          </div>
+
+          {checkingInteractions ? (
+            <div className="py-12 text-center text-[#94A3B8] text-xs space-y-3">
+              <div className="h-5 w-5 border-2 border-[#38BDF8] border-t-transparent rounded-full animate-spin mx-auto" />
+              <p>Cross-referencing medication concepts & pharmacological mechanisms...</p>
+            </div>
+          ) : interactions.length === 0 ? (
+            <div className="p-5 bg-[#2DD4BF]/10 border border-[#2DD4BF]/30 rounded-xl text-[#2DD4BF] text-xs flex items-center gap-3">
+              <span className="text-lg">✓</span>
+              <div>
+                <strong className="block text-[#F8FAFC] font-semibold text-sm">No Interactions Flagged</strong>
+                <p className="text-[#94A3B8] mt-0.5">
+                  All active prescriptions cross-checked cleanly with no known drug-drug risks detected in knowledge base.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {interactions.map((item, idx) => {
+                const key = `${item.pair[0]}-${item.pair[1]}`;
+                const tier = getSeverityTier(item.severity);
+                const isExpanded = expandedCards[key] !== false; // Default expanded
+                const status = flagStatus[key];
+
+                return (
+                  <div
+                    key={idx}
+                    className="relative bg-[#0F172A] border border-[#28354D] rounded-xl overflow-hidden shadow-sm transition hover:border-[#38BDF8]/40"
+                  >
+                    {/* Signature left-edge severity color bar */}
+                    <div className={`absolute top-0 bottom-0 left-0 w-1.5 ${tier.barColor}`} />
+
+                    <div className="pl-5 pr-5 pt-4 pb-4 space-y-3">
+                      {/* Card Header Row */}
+                      <div className="flex items-start justify-between flex-wrap gap-3">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-base font-bold text-[#F8FAFC]">
+                              {item.drugNames[0]} + {item.drugNames[1]}
+                            </h4>
                           </div>
-
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-lg border ${getSeverityBadge(
-                                item.severity
-                              )}`}
-                            >
-                              {item.severity} severity
-                            </span>
-
-                            {status?.success ? (
-                              <span className="px-3.5 py-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-sm">
-                                ✓ Flagged on Twin Record
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleFlagToTwin(item)}
-                                disabled={status?.loading}
-                                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-rose-600/20"
-                              >
-                                {status?.loading ? "Writing Flag..." : "🚩 Write Flag to Twin"}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {item.mechanismOrAncestors && item.mechanismOrAncestors.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 items-center pt-1">
-                            <span className="text-xs text-slate-400 font-medium">Drug Classes:</span>
-                            {item.mechanismOrAncestors.map((cls, cIdx) => (
-                              <span
-                                key={cIdx}
-                                className="px-2.5 py-0.5 bg-slate-900 text-slate-300 text-xs rounded-md border border-slate-800 font-medium"
-                              >
-                                {cls}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="p-4 bg-indigo-950/30 border border-indigo-800/40 rounded-xl space-y-1">
-                          <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 block">
-                            Plain-Language Clinical Explanation
-                          </span>
-                          <p className="text-sm text-slate-200 leading-relaxed font-normal">
-                            {item.plainLanguageExplanation}
+                          <p className="text-xs font-mono text-[#94A3B8]">
+                            RxNorm Pair: {item.pair[0]} • {item.pair[1]}
                           </p>
                         </div>
 
-                        {status?.message && (
-                          <div className="text-xs text-emerald-400 font-mono bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-900/40">
-                            {status.message}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {/* 3-Tier Severity Badge */}
+                          <span
+                            className={`px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded border ${tier.badgeBg} ${tier.badgeText} ${tier.badgeBorder}`}
+                          >
+                            {tier.label}
+                          </span>
+
+                          {/* Inline Flag Status Badge / Action */}
+                          {status?.success ? (
+                            <span className="px-3 py-1 bg-[#2DD4BF]/15 text-[#2DD4BF] border border-[#2DD4BF]/30 text-xs font-bold rounded-lg flex items-center gap-1">
+                              ✓ Flagged on Twin Record
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleFlagToTwin(item)}
+                              disabled={status?.loading}
+                              className="px-3 py-1 bg-[#1E293B] hover:bg-[#26334D] disabled:opacity-50 text-[#F8FAFC] border border-[#28354D] rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+                            >
+                              {status?.loading ? "Writing Flag..." : "🚩 Write Flag to Twin"}
+                            </button>
+                          )}
+
+                          {/* Expand/Collapse Toggle Button */}
+                          <button
+                            onClick={() => toggleExpand(key)}
+                            className="p-1 text-[#94A3B8] hover:text-[#F8FAFC] transition"
+                            aria-label={isExpanded ? "Collapse explanation" : "Expand explanation"}
+                          >
+                            <svg
+                              className={`w-4 h-4 transform transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-          </div>
-        </div>
+
+                      {/* Mechanism / Ancestor Tags */}
+                      {item.mechanismOrAncestors && item.mechanismOrAncestors.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <span className="text-[11px] text-[#94A3B8] uppercase tracking-wider font-semibold">Pharmacological Classes:</span>
+                          {item.mechanismOrAncestors.map((cls, cIdx) => (
+                            <span
+                              key={cIdx}
+                              className="px-2 py-0.5 bg-[#1E293B] text-[#94A3B8] text-xs rounded border border-[#28354D]"
+                            >
+                              {cls}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Expandable Plain-Language Explanation (Humanist Typography) */}
+                      {isExpanded && (
+                        <div className="pt-2">
+                          <div className="p-4 bg-[#162032] border border-[#28354D] rounded-lg space-y-1.5">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[#38BDF8] block">
+                              Clinical Plain-Language Explanation
+                            </span>
+                            <p className="font-narrative text-sm text-[#F8FAFC] leading-relaxed font-normal">
+                              {item.plainLanguageExplanation}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Flagging Result Message */}
+                      {status?.message && (
+                        <div className="text-xs text-[#2DD4BF] font-mono bg-[#162032] p-2.5 rounded-lg border border-[#2DD4BF]/30">
+                          {status.message}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );
