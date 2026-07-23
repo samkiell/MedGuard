@@ -1,22 +1,12 @@
 import { NextResponse } from "next/server";
 import { createHolonClient } from "@ontomorph/holon-client";
-import { MOCK_MEDICATIONS } from "../check/route";
 
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.HOLON_KEY;
-    const useMockMeds = process.env.USE_MOCK_MEDS === "true";
-    let medications: any[] = [];
-
-    if (useMockMeds) {
-      console.log("[/api/interactions/explain] USE_MOCK_MEDS=true flag set, using MOCK_MEDICATIONS");
-      medications = MOCK_MEDICATIONS;
-    } else {
-      const body = await req.json().catch(() => ({}));
-      medications = body.medications || [];
-    }
-
-    const { pair } = await req.json().catch(() => ({ pair: null }));
+    const body = await req.json().catch(() => ({}));
+    const medications: any[] = body.medications || [];
+    const pair = body.pair || null;
     const targetPair = pair || (medications.length >= 2 ? [medications[0].code, medications[1].code] : null);
 
     if (!targetPair || !Array.isArray(targetPair) || targetPair.length < 2) {

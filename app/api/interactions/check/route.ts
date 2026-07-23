@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHolonClient } from "@ontomorph/holon-client";
 
-export const MOCK_MEDICATIONS = [
-  { id: "mock-1", name: "Phenytoin", code: "8183", dosage: "100 mg thrice daily", date: "2026-07-20" },
-  { id: "mock-2", name: "Delavirdine", code: "83816", dosage: "400 mg thrice daily", date: "2026-07-21" },
-  { id: "mock-3", name: "Warfarin", code: "11289", dosage: "5 mg daily", date: "2026-07-22" },
-  { id: "mock-4", name: "Aspirin", code: "1191", dosage: "81 mg daily", date: "2026-07-23" },
-];
-
 export interface PlainLanguageInteraction {
   pair: [string, string];
   drugNames: [string, string];
@@ -20,16 +13,8 @@ export interface PlainLanguageInteraction {
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.HOLON_KEY;
-    const useMockMeds = process.env.USE_MOCK_MEDS === "true";
-    let medications: any[] = [];
-
-    if (useMockMeds) {
-      console.log("[USE_MOCK_MEDS=true] Using MOCK_MEDICATIONS directly:", MOCK_MEDICATIONS);
-      medications = MOCK_MEDICATIONS;
-    } else {
-      const body = await req.json().catch(() => ({}));
-      medications = body.medications || [];
-    }
+    const body = await req.json().catch(() => ({}));
+    const medications: any[] = body.medications || [];
 
     if (!medications || !Array.isArray(medications) || medications.length < 2) {
       return NextResponse.json({

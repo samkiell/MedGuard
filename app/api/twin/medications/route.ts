@@ -25,15 +25,18 @@ export async function GET() {
     const twin = dtp.twins.connect(grantToken);
     
     // Read health events from twin
-    const healthEvents = await twin.events.list();
+    const rawEvents = await twin.events.list();
     
+    console.log("[Digital Twin Connected ID]:", (twin as any).id || (twin as any).twinId || grantToken);
+    console.log("[Digital Twin Raw Events List]:", JSON.stringify(rawEvents, null, 2));
+
     // Filter medication events
-    const medications: MedicationEvent[] = (healthEvents || [])
-      .filter((event: any) => event.type === "medication" || event.category === "medication" || event.drugCode)
+    const medications: MedicationEvent[] = (rawEvents || [])
+      .filter((event: any) => event.type === "medication" || event.category === "medication" || event.drugCode || event.code)
       .map((event: any) => ({
-        id: event.id || "",
-        name: event.name || event.drugName || "Unknown Drug",
-        code: event.code || event.drugCode || "",
+        id: event.id || String(Math.random()),
+        name: event.name || event.drugName || event.title || "Unknown Drug",
+        code: String(event.code || event.drugCode || event.rxNormCode || ""),
         dosage: event.dosage || event.instructions || "",
         date: event.date || event.timestamp || "",
       }));
