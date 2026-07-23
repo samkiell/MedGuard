@@ -11,16 +11,17 @@ export interface MedicationEvent {
 
 export async function GET() {
   try {
-    const platformKey = process.env.DTP_PLATFORM_KEY;
-    if (!grantToken || !platformKey) {
+    const grantToken = process.env.DTP_GRANT_TOKEN;
+    const apiKey = process.env.DTP_KEY;
+    if (!grantToken || !apiKey) {
       return NextResponse.json({
         success: false,
-        error: "DTP credentials (DTP_GRANT_TOKEN / DTP_PLATFORM_KEY) not configured.",
+        error: "DTP credentials (DTP_GRANT_TOKEN / DTP_KEY) not configured.",
         medications: [],
       });
     }
 
-    const dtp = new DTP({ apiKey: platformKey });
+    const dtp = new DTP({ apiKey });
     const twin = dtp.twins.connect(grantToken);
     
     // Read health events from twin

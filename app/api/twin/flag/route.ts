@@ -14,15 +14,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const platformKey = process.env.DTP_PLATFORM_KEY;
-    if (!grantToken || !platformKey) {
+    const apiKey = process.env.DTP_KEY;
+    if (!grantToken || !apiKey) {
       return NextResponse.json(
-        { success: false, error: "DTP credentials (DTP_GRANT_TOKEN / DTP_PLATFORM_KEY) not configured." },
+        { success: false, error: "DTP credentials (DTP_GRANT_TOKEN / DTP_KEY) not configured." },
         { status: 400 }
       );
     }
 
-    const dtp = new DTP({ apiKey: platformKey });
+    const dtp = new DTP({ apiKey });
     const twin = dtp.twins.connect(grantToken);
 
     // Write flag back to the twin
