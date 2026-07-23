@@ -55,19 +55,26 @@ export async function POST(req: Request) {
         
         // Step 1: interactions.checkList
         console.log("[HOLON Step 1] Calling client.interactions.checkList with drugCodes:", drugCodes);
-        const res = await client.interactions.checkList({ drugCodes });
+        const numericIds = drugCodes.map((c) => parseInt(c, 10)).filter((n) => !isNaN(n));
+        const res: any = await client.interactions.checkList(numericIds as any).catch((err: any) => {
+          console.warn("[HOLON checkList warning]:", err?.message || err);
+          return null;
+        });
         console.log("[HOLON Step 1 Output] Raw interactions returned from HOLON:", JSON.stringify(res, null, 2));
 
         if (res && res.interactions) {
           rawInteractions = res.interactions;
+        } else if (res && res.pairs) {
+          rawInteractions = res.pairs.flatMap((p: any) => p.interactions || []);
         }
 
         // Step 2: concepts.getByCode & concepts.getAncestors resolution
         for (const code of drugCodes) {
           try {
             console.log(`[HOLON Step 2] Resolving concept & ancestors for RxNorm code: ${code}`);
-            const concept = await client.concepts.getByCode({ code });
-            const ancestors = await client.concepts.getAncestors({ code });
+            const concept = await client.concepts.getByCode(code, "RxNorm").catch(() => null);
+            const numId = parseInt(code, 10);
+            const ancestors = !isNaN(numId) ? await client.concepts.getAncestors(numId).catch(() => null) : null;
             console.log(`[HOLON Step 2 Output - ${code}] Concept:`, JSON.stringify(concept, null, 2));
             console.log(`[HOLON Step 2 Output - ${code}] Ancestors:`, JSON.stringify(ancestors, null, 2));
             conceptDetailsMap[code] = { concept, ancestors };
@@ -87,29 +94,37 @@ export async function POST(req: Request) {
 
     if (rawInteractions.length > 0) {
       processedInteractions = rawInteractions.map((item: any) => {
-        const med1 = medications.find((m) => m.code === item.pair[0])?.name || item.pair[0];
-        const med2 = medications.find((m) => m.code === item.pair[1])?.name || item.pair[1];
+        const pair0 = String(item.drugAConceptId || item.pair?.[0] || drugCodes[0]);
+        const pair1 = String(item.drugBConceptId || item.pair?.[1] || drugCodes[1]);
+
+        const med1 = medications.find((m) => m.code === pair0)?.name || item.drugAName || pair0;
+        const med2 = medications.find((m) => m.code === pair1)?.name || item.drugBName || pair1;
         
-        const concept1 = conceptDetailsMap[item.pair[0]]?.concept?.name || med1;
-        const concept2 = conceptDetailsMap[item.pair[1]]?.concept?.name || med2;
+        const concept1Obj = conceptDetailsMap[pair0]?.concept?.concept;
+        const concept2Obj = conceptDetailsMap[pair1]?.concept?.concept;
 
-        const ancestors1 = conceptDetailsMap[item.pair[0]]?.ancestors?.map((a: any) => a.name) || [];
-        const ancestors2 = conceptDetailsMap[item.pair[1]]?.ancestors?.map((a: any) => a.name) || [];
+        const ancestors1Obj = conceptDetailsMap[pair0]?.ancestors?.ancestors || [];
+        const ancestors2Obj = conceptDetailsMap[pair1]?.ancestors?.ancestors || [];
 
-        let explanation = item.description || "";
+        const ancestors1 = ancestors1Obj.map((a: any) => a.conceptName || a.name);
+        const ancestors2 = ancestors2Obj.map((a: any) => a.conceptName || a.name);
+
+        const desc = item.clinicalEffect || item.description || item.management;
+
+        let explanation = desc || "";
         if (ancestors1.length > 0 || ancestors2.length > 0) {
           const class1 = ancestors1[0] ? ` (${ancestors1[0]})` : "";
           const class2 = ancestors2[0] ? ` (${ancestors2[0]})` : "";
-          explanation = `Combining ${med1}${class1} and ${med2}${class2}: ${item.description || "increases adverse clinical risk. Monitor patient closely."}`;
+          explanation = `Combining ${med1}${class1} and ${med2}${class2}: ${desc || "increases adverse clinical risk. Monitor patient closely."}`;
         } else {
-          explanation = `Taking ${med1} together with ${med2} may lead to adverse effects: ${item.description || "increased risk of side effects."}`;
+          explanation = `Taking ${med1} together with ${med2} may lead to adverse effects: ${desc || "increased risk of side effects."}`;
         }
 
         return {
-          pair: item.pair,
+          pair: [pair0, pair1],
           drugNames: [med1, med2],
-          severity: item.severity || "moderate",
-          description: item.description || "Interaction detected.",
+          severity: (item.severity || "moderate").toLowerCase() as any,
+          description: desc || "Interaction detected.",
           plainLanguageExplanation: explanation,
           mechanismOrAncestors: [...ancestors1, ...ancestors2],
         };

@@ -40,24 +40,34 @@ export async function POST(req: Request) {
 
     // concepts.getByCode resolution
     console.log(`[HOLON explain] Fetching concepts for codes: ${targetPair[0]}, ${targetPair[1]}`);
-    const concept1 = await client.concepts.getByCode({ code: targetPair[0] }).catch(() => null);
-    const concept2 = await client.concepts.getByCode({ code: targetPair[1] }).catch(() => null);
+    const concept1: any = await client.concepts.getByCode(targetPair[0], "RxNorm").catch(() => null);
+    const concept2: any = await client.concepts.getByCode(targetPair[1], "RxNorm").catch(() => null);
     
-    const ancestors1 = await client.concepts.getAncestors({ code: targetPair[0] }).catch(() => []);
-    const ancestors2 = await client.concepts.getAncestors({ code: targetPair[1] }).catch(() => []);
+    const numId0 = parseInt(targetPair[0], 10);
+    const numId1 = parseInt(targetPair[1], 10);
+
+    const ancestors1: any = !isNaN(numId0) ? await client.concepts.getAncestors(numId0).catch(() => null) : null;
+    const ancestors2: any = !isNaN(numId1) ? await client.concepts.getAncestors(numId1).catch(() => null) : null;
 
     // interactions check for specific pair
-    const res = await client.interactions.checkList({ drugCodes: targetPair }).catch(() => null);
-    const rawInteraction = res?.interactions?.[0];
+    const res: any = !isNaN(numId0) && !isNaN(numId1)
+      ? await client.interactions.checkList([numId0, numId1]).catch(() => null)
+      : null;
+      
+    const rawInteraction = res?.pairs?.[0]?.interactions?.[0] || res?.interactions?.[0];
 
-    const med1Name = medications.find((m) => m.code === targetPair[0])?.name || concept1?.name || targetPair[0];
-    const med2Name = medications.find((m) => m.code === targetPair[1])?.name || concept2?.name || targetPair[1];
+    const med1Name = medications.find((m) => m.code === targetPair[0])?.name || concept1?.concept?.conceptName || targetPair[0];
+    const med2Name = medications.find((m) => m.code === targetPair[1])?.name || concept2?.concept?.conceptName || targetPair[1];
 
-    const class1 = ancestors1?.[0]?.name ? ` (${ancestors1[0].name})` : "";
-    const class2 = ancestors2?.[0]?.name ? ` (${ancestors2[0].name})` : "";
+    const anc1List = ancestors1?.ancestors || [];
+    const anc2List = ancestors2?.ancestors || [];
 
+    const class1 = anc1List[0]?.conceptName ? ` (${anc1List[0].conceptName})` : "";
+    const class2 = anc2List[0]?.conceptName ? ` (${anc2List[0].conceptName})` : "";
+
+    const clinicalEffect = rawInteraction?.clinicalEffect || rawInteraction?.description;
     const explanation = `Combining ${med1Name}${class1} and ${med2Name}${class2}: ${
-      rawInteraction?.description || "increases risk of adverse pharmacological interactions and toxicity. Monitor patient closely."
+      clinicalEffect || "increases risk of adverse pharmacological interactions and toxicity. Monitor patient closely."
     }`;
 
     console.log("[/api/interactions/explain Output]:", {
@@ -72,7 +82,7 @@ export async function POST(req: Request) {
         pair: targetPair,
         drugNames: [med1Name, med2Name],
         severity: rawInteraction?.severity || "high",
-        description: rawInteraction?.description || "Interaction detected.",
+        description: clinicalEffect || "Interaction detected.",
         plainLanguageExplanation: explanation,
         concepts: { concept1, concept2 },
         ancestors: { ancestors1, ancestors2 },

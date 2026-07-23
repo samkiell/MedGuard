@@ -11,7 +11,7 @@ export async function GET() {
       );
     }
 
-    const client = createHolonClient({ apiKey });
+    const client = createHolonClient({ apiKey } as any);
     const response = await client.concepts.search("aspirin");
 
     return NextResponse.json({ success: true, data: response });
