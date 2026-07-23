@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { HolonClient } from "@ontomorph/holon-client";
+import { createHolonClient } from "@ontomorph/holon-client";
 
 export async function GET() {
   try {
@@ -11,8 +11,8 @@ export async function GET() {
       );
     }
 
-    const client = new HolonClient({ apiKey });
-    const response = await client.concepts.search({ query: "aspirin" });
+    const client = createHolonClient({ apiKey });
+    const response = await client.concepts.search("aspirin");
 
     return NextResponse.json({ success: true, data: response });
   } catch (error: any) {

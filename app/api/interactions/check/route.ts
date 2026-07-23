@@ -49,6 +49,7 @@ export async function POST(req: Request) {
     let conceptDetailsMap: Record<string, any> = {};
 
     if (apiKey) {
+      try {
         const apiUrl = process.env.HOLON_API_URL;
         const client = createHolonClient(apiUrl ? ({ apiKey, apiUrl } as any) : ({ apiKey } as any));
         
