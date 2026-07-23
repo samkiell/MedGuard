@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHolonClient } from "@ontomorph/holon-client";
+import { checkReferenceFallback } from "@/lib/referenceInteractions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,6 +12,7 @@ export interface PlainLanguageInteraction {
   description: string;
   plainLanguageExplanation: string;
   mechanismOrAncestors?: string[];
+  source?: "holon_live" | "reference";
 }
 
 export async function POST(req: Request) {
@@ -151,8 +153,35 @@ export async function POST(req: Request) {
           description: desc || "Interaction detected.",
           plainLanguageExplanation: explanation,
           mechanismOrAncestors: [...ancestors1, ...ancestors2],
+          source: "holon_live",
         };
       });
+    }
+
+    // Step 3: Reference Layer Fallback (used ONLY if HOLON returns 0 live interactions)
+    if (processedInteractions.length === 0) {
+      console.log("[API /api/interactions/check] Live HOLON checkList returned 0 interactions. Checking local reference fallback layer...");
+      const fallbackMatches = checkReferenceFallback(drugCodes);
+
+      if (fallbackMatches.length > 0) {
+        console.log(`[API /api/interactions/check] Matched ${fallbackMatches.length} local reference interaction(s):`, fallbackMatches);
+        processedInteractions = fallbackMatches.map(({ pair, item }) => {
+          const med1Obj = medications.find((m) => String(m.code) === String(pair[0]));
+          const med2Obj = medications.find((m) => String(m.code) === String(pair[1]));
+          const med1Name = med1Obj?.name || item.drugAName;
+          const med2Name = med2Obj?.name || item.drugBName;
+
+          return {
+            pair: [pair[0], pair[1]],
+            drugNames: [med1Name, med2Name],
+            severity: item.severity,
+            description: item.clinicalEffect,
+            plainLanguageExplanation: item.explanation,
+            mechanismOrAncestors: item.ancestors || [],
+            source: "reference",
+          };
+        });
+      }
     }
 
     console.log("[HOLON Step 2 Output] Final Processed Plain-Language Interactions:", JSON.stringify(processedInteractions, null, 2));

@@ -17,6 +17,7 @@ interface PlainLanguageInteraction {
   description: string;
   plainLanguageExplanation: string;
   mechanismOrAncestors?: string[];
+  source?: "holon_live" | "reference";
 }
 
 export default function Home() {
@@ -409,9 +410,25 @@ export default function Home() {
                               {item.drugNames[0]} + {item.drugNames[1]}
                             </h4>
                           </div>
-                          <p className="text-xs font-mono text-[#94A3B8]">
-                            RxNorm Pair: {item.pair[0]} • {item.pair[1]}
-                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs font-mono text-[#94A3B8]">
+                              RxNorm Pair: {item.pair[0]} • {item.pair[1]}
+                            </p>
+                            {item.source === "reference" ? (
+                              <span
+                                className="px-2 py-0.5 text-[10px] font-medium rounded bg-[#334155]/60 text-[#CBD5E1] border border-[#475569]/60 flex items-center gap-1"
+                                title="HOLON live check returned no result for this pair. Sourced from local reference data fallback."
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-[#94A3B8]" />
+                                Reference data (HOLON live check returned no result for this pair)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 text-[10px] font-medium rounded bg-[#2DD4BF]/10 text-[#2DD4BF] border border-[#2DD4BF]/30 flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-[#2DD4BF]" />
+                                HOLON Live Finding
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-3">
