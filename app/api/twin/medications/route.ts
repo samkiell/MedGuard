@@ -24,11 +24,17 @@ export async function GET() {
     const dtp = new DTP({ apiKey });
     const twin = dtp.twins.connect(grantToken);
     
-    // Read health events from twin
-    const rawEvents = await twin.events.list();
-    
     console.log("[Digital Twin Connected ID]:", (twin as any).id || (twin as any).twinId || grantToken);
-    console.log("[Digital Twin Raw Events List]:", JSON.stringify(rawEvents, null, 2));
+    
+    // Read health events from twin
+    let rawEvents: any[] = [];
+    try {
+      rawEvents = await twin.events.list();
+      console.log("[Digital Twin Raw Events List]:", JSON.stringify(rawEvents, null, 2));
+    } catch (eventsErr: any) {
+      console.warn("[Digital Twin Raw Events Fetch Warning]:", eventsErr?.message || eventsErr);
+      console.log("[Digital Twin Raw Events List]: []");
+    }
 
     // Filter medication events
     const medications: MedicationEvent[] = (rawEvents || [])
