@@ -11,27 +11,26 @@ export interface MedicationEvent {
 
 export async function GET() {
   try {
-    const grantToken = process.env.DTP_GRANT_TOKEN;
-    if (!grantToken) {
+    const platformKey = process.env.DTP_PLATFORM_KEY;
+    if (!grantToken || !platformKey) {
       return NextResponse.json({
         success: false,
-        error: "DTP_GRANT_TOKEN is not configured.",
+        error: "DTP credentials (DTP_GRANT_TOKEN / DTP_PLATFORM_KEY) not configured.",
         medications: [],
       });
     }
 
-    const dtp = new DTP({ apiKey: process.env.DTP_PLATFORM_KEY || "dtp_test_key" });
+    const dtp = new DTP({ apiKey: platformKey });
     const twin = dtp.twins.connect(grantToken);
     
     // Read health events from twin
     const healthEvents = await twin.events.list();
-
     
     // Filter medication events
     const medications: MedicationEvent[] = (healthEvents || [])
       .filter((event: any) => event.type === "medication" || event.category === "medication" || event.drugCode)
       .map((event: any) => ({
-        id: event.id || String(Math.random()),
+        id: event.id || "",
         name: event.name || event.drugName || "Unknown Drug",
         code: event.code || event.drugCode || "",
         dosage: event.dosage || event.instructions || "",

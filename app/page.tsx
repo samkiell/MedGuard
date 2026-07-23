@@ -63,14 +63,11 @@ export default function Home() {
       const res = await fetch("/api/twin/medications");
       const data = await res.json();
       let meds: Medication[] = [];
-      if (data.success && data.medications.length > 0) {
+      if (data.success && Array.isArray(data.medications)) {
         meds = data.medications;
-      } else {
-        if (data.error) setError(data.error);
-        meds = [
-          { id: "1", name: "Aspirin", code: "1191", dosage: "81mg daily" },
-          { id: "2", name: "Warfarin", code: "11289", dosage: "5mg daily" },
-        ];
+      }
+      if (data.error) {
+        setError(data.error);
       }
       setMedications(meds);
       runInteractionCheck(meds);
@@ -210,7 +207,7 @@ export default function Home() {
 
         {error && (
           <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-sm flex items-center gap-2">
-            <span>⚠️</span> {error} (Falling back to active sandbox profile).
+            <span>⚠️</span> {error}
           </div>
         )}
 

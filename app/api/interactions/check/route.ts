@@ -90,26 +90,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Fallback detection logic if HOLON key missing or mock test pair used
-    if (processedInteractions.length === 0 && drugCodes.length >= 2) {
-      const hasAspirin = medications.some((m) => m.name.toLowerCase().includes("aspirin") || m.code === "1191");
-      const hasWarfarin = medications.some((m) => m.name.toLowerCase().includes("warfarin") || m.code === "11289");
-
-      if (hasAspirin && hasWarfarin) {
-        const asp = medications.find((m) => m.name.toLowerCase().includes("aspirin") || m.code === "1191");
-        const war = medications.find((m) => m.name.toLowerCase().includes("warfarin") || m.code === "11289");
-        
-        processedInteractions.push({
-          pair: [asp?.code || "1191", war?.code || "11289"],
-          drugNames: [asp?.name || "Aspirin", war?.name || "Warfarin"],
-          severity: "high",
-          description: "Co-administration of Aspirin (NSAID/Antiplatelet) and Warfarin (Anticoagulant) significantly increases bleeding risks.",
-          plainLanguageExplanation: "Both Aspirin (an antiplatelet agent) and Warfarin (a blood thinner) impair blood clotting. Using them together greatly increases the danger of internal bleeding or stomach ulcers. Care team monitoring is strongly advised.",
-          mechanismOrAncestors: ["Antiplatelet Agent", "Anticoagulant"],
-        });
-      }
-    }
-
     return NextResponse.json({
       success: true,
       interactions: processedInteractions,

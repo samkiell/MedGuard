@@ -14,37 +14,32 @@ export async function POST(req: Request) {
       );
     }
 
-    if (grantToken) {
-      try {
-        const dtp = new DTP({ apiKey: process.env.DTP_PLATFORM_KEY || "dtp_test_key" });
-        const twin = dtp.twins.connect(grantToken);
-
-        // Write flag back to the twin
-        await twin.flag("pharmacology", {
-          eventType: "POLYPHARMACY_INTERACTION_RISK",
-          title: `Drug Interaction: ${interaction.drugNames[0]} + ${interaction.drugNames[1]}`,
-          description: interaction.plainLanguageExplanation,
-          data: {
-            pair: interaction.pair,
-            drugNames: interaction.drugNames,
-            severity: interaction.severity,
-          },
-        });
-
-
-        return NextResponse.json({
-          success: true,
-          message: "Flag successfully written to Digital Twin.",
-        });
-      } catch (sdkError: any) {
-        console.warn("DTP SDK flag call failed, returning simulated success for demo fallback:", sdkError.message);
-      }
+    const platformKey = process.env.DTP_PLATFORM_KEY;
+    if (!grantToken || !platformKey) {
+      return NextResponse.json(
+        { success: false, error: "DTP credentials (DTP_GRANT_TOKEN / DTP_PLATFORM_KEY) not configured." },
+        { status: 400 }
+      );
     }
 
-    // Fallback success response if grant token is not yet connected or API in sandbox mode
+    const dtp = new DTP({ apiKey: platformKey });
+    const twin = dtp.twins.connect(grantToken);
+
+    // Write flag back to the twin
+    await twin.flag("pharmacology", {
+      eventType: "POLYPHARMACY_INTERACTION_RISK",
+      title: `Drug Interaction: ${interaction.drugNames[0]} + ${interaction.drugNames[1]}`,
+      description: interaction.plainLanguageExplanation,
+      data: {
+        pair: interaction.pair,
+        drugNames: interaction.drugNames,
+        severity: interaction.severity,
+      },
+    });
+
     return NextResponse.json({
       success: true,
-      message: "Flag successfully recorded for Twin (Simulated / Sandbox mode).",
+      message: "Flag successfully written to Digital Twin.",
     });
   } catch (error: any) {
     return NextResponse.json(

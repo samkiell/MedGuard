@@ -18,33 +18,19 @@ export async function GET() {
     const baseUrl = process.env.DTP_BASE_URL || "https://api.ontomorph.com";
 
     // 1. Create or select a sandbox test twin if one doesn't exist
-    let twinId = "sandbox-twin-1";
-    try {
-      const twinsRes = await fetch(`${baseUrl}/twins?environment=test`, {
-        headers: {
-          "X-DTP-API-Key": platformKey,
-          Accept: "application/json",
-        },
-      });
+    let twinId = "";
+    const twinsRes = await fetch(`${baseUrl}/twins?environment=test`, {
+      headers: {
+        "X-DTP-API-Key": platformKey,
+        Accept: "application/json",
+      },
+    });
 
-      if (twinsRes.ok) {
-        const twinsData = await twinsRes.json();
-        const twins = twinsData.data || twinsData;
-        if (Array.isArray(twins) && twins.length > 0) {
-          twinId = twins[0].id || twins[0].twinId || twinId;
-        } else {
-          const createTwinRes = await fetch(`${baseUrl}/twins`, {
-            method: "POST",
-            headers: {
-              "X-DTP-API-Key": platformKey,
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({ environment: "test" }),
-          });
-          const createTwinData = await createTwinRes.json();
-          twinId = createTwinData.data?.id || createTwinData.id || createTwinData.twinId || twinId;
-        }
+    if (twinsRes.ok) {
+      const twinsData = await twinsRes.json();
+      const twins = twinsData.data || twinsData;
+      if (Array.isArray(twins) && twins.length > 0) {
+        twinId = twins[0].id || twins[0].twinId || "";
       } else {
         const createTwinRes = await fetch(`${baseUrl}/twins`, {
           method: "POST",
@@ -55,11 +41,32 @@ export async function GET() {
           },
           body: JSON.stringify({ environment: "test" }),
         });
-        const createTwinData = await createTwinRes.json();
-        twinId = createTwinData.data?.id || createTwinData.id || createTwinData.twinId || twinId;
+        if (createTwinRes.ok) {
+          const createTwinData = await createTwinRes.json();
+          twinId = createTwinData.data?.id || createTwinData.id || createTwinData.twinId || "";
+        }
       }
-    } catch (twinErr) {
-      console.warn("Twin query/create warning, using default sandbox twinId:", twinErr);
+    } else {
+      const createTwinRes = await fetch(`${baseUrl}/twins`, {
+        method: "POST",
+        headers: {
+          "X-DTP-API-Key": platformKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ environment: "test" }),
+      });
+      if (createTwinRes.ok) {
+        const createTwinData = await createTwinRes.json();
+        twinId = createTwinData.data?.id || createTwinData.id || createTwinData.twinId || "";
+      }
+    }
+
+    if (!twinId) {
+      return NextResponse.json(
+        { error: "Failed to resolve or create a Digital Twin on the DTP platform." },
+        { status: 500 }
+      );
     }
 
     // 2. Generate a grant token scoped to read/write twins and events using grants:write scope
@@ -77,7 +84,6 @@ export async function GET() {
       }),
     });
 
-
     const grantBody = await grantRes.json().catch(() => null);
 
     if (grantRes.ok && grantBody) {
@@ -85,7 +91,14 @@ export async function GET() {
     }
 
     if (!grantToken) {
-      grantToken = grantBody?.data?.token || grantBody?.token || `dtp_grant_${twinId}_${Date.now()}`;
+      return NextResponse.json(
+        {
+          error: "Failed to issue grant token from DTP platform API",
+          apiStatus: grantRes.status,
+          apiResponseBody: grantBody,
+        },
+        { status: grantRes.status || 500 }
+      );
     }
 
     // Log the resulting twin ID and grant token to the console
