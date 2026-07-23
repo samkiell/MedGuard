@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { DTPClient } from "@ontomorph/dtp-sdk";
+import { DTP } from "@ontomorph/dtp-sdk";
 
 export async function POST(req: Request) {
   try {
@@ -16,21 +16,21 @@ export async function POST(req: Request) {
 
     if (grantToken) {
       try {
-        const dtp = new DTPClient();
-        const twin = await dtp.twins.connect({ grantToken });
+        const dtp = new DTP({ apiKey: process.env.DTP_PLATFORM_KEY || "dtp_test_key" });
+        const twin = dtp.twins.connect(grantToken);
 
         // Write flag back to the twin
-        await twin.createFlag({
-          type: "POLYPHARMACY_INTERACTION_RISK",
-          severity: interaction.severity,
+        await twin.flag("pharmacology", {
+          eventType: "POLYPHARMACY_INTERACTION_RISK",
           title: `Drug Interaction: ${interaction.drugNames[0]} + ${interaction.drugNames[1]}`,
-          content: interaction.plainLanguageExplanation,
-          metadata: {
+          description: interaction.plainLanguageExplanation,
+          data: {
             pair: interaction.pair,
             drugNames: interaction.drugNames,
-            timestamp: new Date().toISOString(),
+            severity: interaction.severity,
           },
         });
+
 
         return NextResponse.json({
           success: true,

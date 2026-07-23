@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { HolonClient } from "@ontomorph/holon-client";
+import { createHolonClient } from "@ontomorph/holon-client";
 
 export interface PlainLanguageInteraction {
   pair: [string, string];
@@ -33,8 +33,9 @@ export async function POST(req: Request) {
 
     if (apiKey) {
       try {
-        const client = new HolonClient({ apiKey });
+        const client = createHolonClient({ apiKey });
         const res = await client.interactions.checkList({ drugCodes });
+
         if (res && res.interactions) {
           rawInteractions = res.interactions;
         }

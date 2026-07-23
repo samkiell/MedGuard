@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { DTPClient } from "@ontomorph/dtp-sdk";
+import { DTP } from "@ontomorph/dtp-sdk";
 
 export interface MedicationEvent {
   id: string;
@@ -20,11 +20,12 @@ export async function GET() {
       });
     }
 
-    const dtp = new DTPClient();
-    const twin = await dtp.twins.connect({ grantToken });
+    const dtp = new DTP({ apiKey: process.env.DTP_PLATFORM_KEY || "dtp_test_key" });
+    const twin = dtp.twins.connect(grantToken);
     
     // Read health events from twin
-    const healthEvents = await twin.getHealthEvents();
+    const healthEvents = await twin.events.list();
+
     
     // Filter medication events
     const medications: MedicationEvent[] = (healthEvents || [])
