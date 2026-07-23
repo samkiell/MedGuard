@@ -5,9 +5,6 @@ export async function GET() {
   try {
     const platformKey = process.env.DTP_PLATFORM_KEY;
 
-    console.log("[SERVER DEBUG] Env var being read: DTP_PLATFORM_KEY");
-    console.log("[SERVER DEBUG] process.env.DTP_PLATFORM_KEY present:", Boolean(platformKey), "Length:", platformKey ? platformKey.length : 0, "Prefix:", platformKey ? platformKey.substring(0, 18) : "N/A");
-
     if (!platformKey) {
       return NextResponse.json(
         { error: "DTP_PLATFORM_KEY is missing in environment variables" },
