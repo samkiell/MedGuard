@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const platformKey = process.env.DTP_PLATFORM_KEY;
+    const envVarName = "DTP_PLATFORM_KEY";
+    const platformKey = process.env[envVarName];
+    console.log(`[DTP Grants Create Debug] Env var name: ${envVarName}, Present: ${Boolean(platformKey)}, Length: ${platformKey?.length ?? 0}`);
 
     if (!platformKey) {
       return NextResponse.json(
