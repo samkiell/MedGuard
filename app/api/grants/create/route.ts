@@ -19,53 +19,19 @@ export async function GET() {
       holonApiKey,
     }) as any;
 
-    let grant: any = null;
-    let token: string = "";
+    const sdkSurface = {
+      dtpInstanceKeys: Object.keys(dtp),
+      dtpKeysMethods: dtp.keys ? Object.getOwnPropertyNames(Object.getPrototypeOf(dtp.keys)) : null,
+      dtpTwinsMethods: dtp.twins ? Object.getOwnPropertyNames(Object.getPrototypeOf(dtp.twins)) : null,
+      dtpConfig: dtp.config ? Object.keys(dtp.config) : null,
+    };
 
-    if (dtp.grants && typeof dtp.grants.create === "function") {
-      grant = await dtp.grants.create({
-        scope: ["events:read", "events:write"],
-        expiresAt: "2026-12-31",
-      });
-      console.log("[DTP Grants Create] Full grant object from dtp.grants.create:", JSON.stringify(grant, null, 2));
-      token = grant?.token || grant?.grantToken || grant?.data?.token || grant?.data?.grantToken || "";
-    } else {
-      console.log("[DTP Grants Create] dtp.grants is undefined in @ontomorph/dtp-sdk 0.1.2. Available properties on dtp instance:", Object.keys(dtp));
-      token = process.env.DTP_GRANT_TOKEN || "dtp_grant_sandbox-twin-1_1784765181304";
-      grant = {
-        notice: "dtp.grants is not exposed on @ontomorph/dtp-sdk 0.1.2 instance",
-        token,
-        scope: ["events:read", "events:write"],
-        expiresAt: "2026-12-31",
-      };
-      console.log("[DTP Grants Create] Full grant object fallback:", JSON.stringify(grant, null, 2));
-    }
-
-    let twin: any = null;
-    let twinError: any = null;
-    if (token) {
-      try {
-        twin = await dtp.twins.connect(token);
-        console.log("[DTP Grants Create] Connected twin handle:", {
-          id: twin.id,
-          grant: twin.grant,
-        });
-      } catch (err: any) {
-        twinError = {
-          message: err?.message,
-          code: err?.code,
-        };
-        console.log("[DTP Grants Create] Twin connect error:", err?.message);
-      }
-    }
+    console.log("[DTP SDK Surface Inspection]", JSON.stringify(sdkSurface, null, 2));
 
     return NextResponse.json({
-      grant,
-      twinId: twin?.id || twin?.grant?.twinId || null,
-      token: token || null,
-      twinConnected: Boolean(twin),
-      twinError,
-      availableSdkKeys: Object.keys(dtp),
+      status: "NO_GRANT_CREATION_METHOD_IN_SDK_0_1_2",
+      message: "Version 0.1.2 of @ontomorph/dtp-sdk is the latest npm release, but does not expose any grant creation method (dtp.grants does not exist). Grants must be issued out-of-band or provided via DTP_GRANT_TOKEN.",
+      sdkSurface,
     });
   } catch (error: any) {
     console.error("[DTP Grants Create Error]:", error);
@@ -73,8 +39,6 @@ export async function GET() {
       {
         error: error?.message || "Internal server error",
         stack: error?.stack,
-        code: error?.code,
-        details: error?.details,
       },
       { status: 500 }
     );

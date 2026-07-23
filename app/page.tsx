@@ -70,9 +70,12 @@ export default function Home() {
         setError(data.error);
       }
       setMedications(meds);
+      // Run interaction check with twin meds or let backend USE_MOCK_MEDS handle it
       runInteractionCheck(meds);
     } catch (err: any) {
       setError(err.message);
+      // Even on error reading twin, trigger check in case USE_MOCK_MEDS is enabled on backend
+      runInteractionCheck([]);
     } finally {
       setLoadingMeds(false);
     }

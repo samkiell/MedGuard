@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { createHolonClient } from "@ontomorph/holon-client";
 
+export const MOCK_MEDICATIONS = [
+  { id: "mock-1", name: "Warfarin", code: "11289", dosage: "5 mg daily", date: "2026-07-20" },
+  { id: "mock-2", name: "Aspirin", code: "1191", dosage: "81 mg daily", date: "2026-07-21" },
+  { id: "mock-3", name: "Simvastatin", code: "36567", dosage: "20 mg daily", date: "2026-07-22" },
+  { id: "mock-4", name: "Clarithromycin", code: "21212", dosage: "500 mg twice daily", date: "2026-07-23" },
+];
+
 export interface PlainLanguageInteraction {
   pair: [string, string];
   drugNames: [string, string];
@@ -13,8 +20,16 @@ export interface PlainLanguageInteraction {
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.HOLON_KEY;
-    const body = await req.json();
-    const { medications } = body;
+    const useMockMeds = process.env.USE_MOCK_MEDS === "true";
+    let medications: any[] = [];
+
+    if (useMockMeds) {
+      console.log("[USE_MOCK_MEDS=true] Using MOCK_MEDICATIONS directly:", MOCK_MEDICATIONS);
+      medications = MOCK_MEDICATIONS;
+    } else {
+      const body = await req.json().catch(() => ({}));
+      medications = body.medications || [];
+    }
 
     if (!medications || !Array.isArray(medications) || medications.length < 2) {
       return NextResponse.json({
@@ -28,34 +43,45 @@ export async function POST(req: Request) {
       .map((m: any) => m.code)
       .filter((code: string) => Boolean(code));
 
+    console.log("[API /api/interactions/check] Extracting RxNorm Drug Codes:", drugCodes);
+
     let rawInteractions: any[] = [];
     let conceptDetailsMap: Record<string, any> = {};
 
     if (apiKey) {
-      try {
-        const client = createHolonClient({ apiKey });
+        const apiUrl = process.env.HOLON_API_URL;
+        const client = createHolonClient(apiUrl ? ({ apiKey, apiUrl } as any) : ({ apiKey } as any));
+        
+        // Step 1: interactions.checkList
+        console.log("[HOLON Step 1] Calling client.interactions.checkList with drugCodes:", drugCodes);
         const res = await client.interactions.checkList({ drugCodes });
+        console.log("[HOLON Step 1 Output] Raw interactions returned from HOLON:", JSON.stringify(res, null, 2));
 
         if (res && res.interactions) {
           rawInteractions = res.interactions;
         }
 
-        // Fetch concept/ancestor info for enhanced plain language details
+        // Step 2: concepts.getByCode & concepts.getAncestors resolution
         for (const code of drugCodes) {
           try {
+            console.log(`[HOLON Step 2] Resolving concept & ancestors for RxNorm code: ${code}`);
             const concept = await client.concepts.getByCode({ code });
             const ancestors = await client.concepts.getAncestors({ code });
+            console.log(`[HOLON Step 2 Output - ${code}] Concept:`, JSON.stringify(concept, null, 2));
+            console.log(`[HOLON Step 2 Output - ${code}] Ancestors:`, JSON.stringify(ancestors, null, 2));
             conceptDetailsMap[code] = { concept, ancestors };
-          } catch (cErr) {
-            // ignore individual concept resolution failure
+          } catch (cErr: any) {
+            console.warn(`[HOLON Step 2 Error - ${code}]:`, cErr?.message || cErr);
           }
         }
       } catch (clientErr: any) {
-        console.warn("HOLON API client call warning:", clientErr.message);
+        console.warn("[HOLON API Client Error]:", clientErr.message);
       }
+    } else {
+      console.warn("[API /api/interactions/check] HOLON_KEY not present in environment variables.");
     }
 
-    // Process interactions into plain-language explanations
+    // Step 3: Process interactions into plain-language explanations
     let processedInteractions: PlainLanguageInteraction[] = [];
 
     if (rawInteractions.length > 0) {
@@ -69,7 +95,6 @@ export async function POST(req: Request) {
         const ancestors1 = conceptDetailsMap[item.pair[0]]?.ancestors?.map((a: any) => a.name) || [];
         const ancestors2 = conceptDetailsMap[item.pair[1]]?.ancestors?.map((a: any) => a.name) || [];
 
-        // Build plain language explanation
         let explanation = item.description || "";
         if (ancestors1.length > 0 || ancestors2.length > 0) {
           const class1 = ancestors1[0] ? ` (${ancestors1[0]})` : "";
@@ -90,11 +115,14 @@ export async function POST(req: Request) {
       });
     }
 
+    console.log("[HOLON Step 3 Output] Final Processed Plain-Language Interactions:", JSON.stringify(processedInteractions, null, 2));
+
     return NextResponse.json({
       success: true,
       interactions: processedInteractions,
     });
   } catch (error: any) {
+    console.error("[API /api/interactions/check Error]:", error);
     return NextResponse.json(
       {
         success: false,
