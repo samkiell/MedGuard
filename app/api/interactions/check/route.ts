@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createHolonClient } from "@ontomorph/holon-client";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export interface PlainLanguageInteraction {
   pair: [string, string];
   drugNames: [string, string];
@@ -11,12 +14,18 @@ export interface PlainLanguageInteraction {
 }
 
 export async function POST(req: Request) {
+  console.log("==================================================================");
+  console.log("[API /api/interactions/check] POST request handler hit at:", new Date().toISOString());
+
   try {
     const apiKey = process.env.HOLON_KEY;
     const body = await req.json().catch(() => ({}));
     const medications: any[] = body.medications || [];
 
+    console.log("[API /api/interactions/check] Received medications payload:", JSON.stringify(medications, null, 2));
+
     if (!medications || !Array.isArray(medications) || medications.length < 2) {
+      console.log("[API /api/interactions/check] Fewer than 2 medications provided. Returning empty interactions.");
       return NextResponse.json({
         success: true,
         interactions: [],
@@ -89,7 +98,7 @@ export async function POST(req: Request) {
             console.warn("[HOLON checkList warning]:", err?.message || err);
             return null;
           });
-          console.log("[HOLON Step 1 Output] Raw interactions returned from HOLON:", JSON.stringify(res, null, 2));
+          console.log("[HOLON Step 1 Output] Raw interactions returned from HOLON for THIS request:", JSON.stringify(res, null, 2));
 
           if (res && res.interactions) {
             rawInteractions = res.interactions;
@@ -109,14 +118,17 @@ export async function POST(req: Request) {
 
     if (rawInteractions.length > 0) {
       processedInteractions = rawInteractions.map((item: any) => {
-        const codeA = item.drugACode || String(item.drugAConceptId || item.pair?.[0]);
-        const codeB = item.drugBCode || String(item.drugBConceptId || item.pair?.[1]);
+        const cidA = Number(item.pair?.[0] || item.drugAConceptId);
+        const cidB = Number(item.pair?.[1] || item.drugBConceptId);
 
-        const med1 = medications.find((m) => m.code === codeA || codeToConceptIdMap[m.code] === item.drugAConceptId)?.name || item.drugAName || codeA;
-        const med2 = medications.find((m) => m.code === codeB || codeToConceptIdMap[m.code] === item.drugBConceptId)?.name || item.drugBName || codeB;
+        const codeA = item.drugACode || conceptIdToCodeMap[cidA] || String(cidA);
+        const codeB = item.drugBCode || conceptIdToCodeMap[cidB] || String(cidB);
+
+        const med1 = medications.find((m) => m.code === codeA || codeToConceptIdMap[m.code] === cidA)?.name || item.drugAName || codeA;
+        const med2 = medications.find((m) => m.code === codeB || codeToConceptIdMap[m.code] === cidB)?.name || item.drugBName || codeB;
         
-        const ancestors1Obj = conceptDetailsMap[codeA]?.ancestors?.ancestors || [];
-        const ancestors2Obj = conceptDetailsMap[codeB]?.ancestors?.ancestors || [];
+        const ancestors1Obj = (conceptDetailsMap[codeA] || conceptDetailsMap[cidA])?.ancestors?.ancestors || [];
+        const ancestors2Obj = (conceptDetailsMap[codeB] || conceptDetailsMap[cidB])?.ancestors?.ancestors || [];
 
         const ancestors1 = ancestors1Obj.map((a: any) => a.conceptName || a.name);
         const ancestors2 = ancestors2Obj.map((a: any) => a.conceptName || a.name);
@@ -161,3 +173,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

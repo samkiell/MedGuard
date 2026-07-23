@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { DTP } from "@ontomorph/dtp-sdk";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export interface MedicationEvent {
   id: string;
   name: string;
