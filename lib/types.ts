@@ -4,6 +4,10 @@ export interface Medication {
   code: string;
   dosage?: string;
   date?: string;
+  isResolving?: boolean;
+  resolutionError?: string;
+  holonMappingFailed?: boolean;
+  rxcui?: string;
 }
 
 export type SeverityLevel = "high" | "moderate" | "low" | "unknown" | "severe" | "mild";
