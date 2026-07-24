@@ -221,22 +221,3 @@ export async function POST(req: Request) {
   }
 }
 
-    console.log("[HOLON Step 2 Output] Final Processed Plain-Language Interactions:", JSON.stringify(processedInteractions, null, 2));
-
-    return NextResponse.json({
-      success: true,
-      interactions: processedInteractions,
-    });
-  } catch (error: any) {
-    console.error("[API /api/interactions/check Error]:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error?.message || "Failed to perform interaction check",
-        interactions: [],
-      },
-      { status: 500 }
-    );
-  }
-}
-
