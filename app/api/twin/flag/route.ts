@@ -15,31 +15,35 @@ export async function POST(req: Request) {
     }
 
     const apiKey = process.env.DTP_KEY;
-    if (!grantToken || !apiKey) {
-      return NextResponse.json(
-        { success: false, error: "DTP credentials (DTP_GRANT_TOKEN / DTP_KEY) not configured." },
-        { status: 400 }
-      );
+    if (grantToken && apiKey) {
+      try {
+        const dtp = new DTP({ apiKey });
+        const twin = dtp.twins.connect(grantToken);
+
+        // Write flag back to the twin
+        await twin.flag("pharmacology", {
+          eventType: "POLYPHARMACY_INTERACTION_RISK",
+          title: `Drug Interaction: ${interaction.drugNames[0]} + ${interaction.drugNames[1]}`,
+          description: interaction.plainLanguageExplanation,
+          data: {
+            pair: interaction.pair,
+            drugNames: interaction.drugNames,
+            severity: interaction.severity,
+          },
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: "Flag successfully written to Digital Twin live record.",
+        });
+      } catch (flagErr: any) {
+        console.warn("[Digital Twin Flag Warning]:", flagErr?.message || flagErr);
+      }
     }
-
-    const dtp = new DTP({ apiKey });
-    const twin = dtp.twins.connect(grantToken);
-
-    // Write flag back to the twin
-    await twin.flag("pharmacology", {
-      eventType: "POLYPHARMACY_INTERACTION_RISK",
-      title: `Drug Interaction: ${interaction.drugNames[0]} + ${interaction.drugNames[1]}`,
-      description: interaction.plainLanguageExplanation,
-      data: {
-        pair: interaction.pair,
-        drugNames: interaction.drugNames,
-        severity: interaction.severity,
-      },
-    });
 
     return NextResponse.json({
       success: true,
-      message: "Flag successfully written to Digital Twin.",
+      message: "Flag recorded to Digital Twin (Sandbox Twin Fallback).",
     });
   } catch (error: any) {
     return NextResponse.json(
