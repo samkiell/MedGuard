@@ -207,8 +207,8 @@ export default function Home() {
       <header className="border-b border-[#28354D] bg-[#162032]/80 backdrop-blur-md sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-[#1E293B] border border-[#28354D] flex items-center justify-center text-[#2DD4BF] font-semibold text-sm">
-              🛡️
+            <div className="h-8 w-8 rounded-lg bg-[#1E293B] border border-[#28354D] p-1 flex items-center justify-center overflow-hidden">
+              <img src="/assets/favicon.ico" alt="MedGuard Logo" className="h-full w-full object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-2">

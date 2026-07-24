@@ -112,8 +112,12 @@ export async function getValidGrantToken(options: { forceRefresh?: boolean } = {
     return activeRefreshPromise;
   }
 
-  console.log(`[DTP Token Manager] Reusing active in-memory grant token for twin '${cachedGrant.twinId}' (Valid until ${new Date(cachedGrant.expiresAtMs).toISOString()}).`);
-  return cachedGrant;
+  if (cachedGrant) {
+    console.log(`[DTP Token Manager] Reusing active in-memory grant token for twin '${cachedGrant.twinId}' (Valid until ${new Date(cachedGrant.expiresAtMs).toISOString()}).`);
+    return cachedGrant;
+  }
+
+  return mintFreshGrantToken();
 }
 
 /**
