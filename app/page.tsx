@@ -439,6 +439,16 @@ export default function Home() {
                             {tier.label}
                           </span>
 
+                          {item.source === "reference" && (
+                            <span
+                              className="px-2.5 py-1 text-xs font-semibold rounded bg-[#334155] text-[#F1F5F9] border border-[#475569] flex items-center gap-1.5"
+                              title="HOLON live check returned no result for this pair. Sourced from local reference data fallback."
+                            >
+                              <span className="h-2 w-2 rounded-full bg-[#F59E0B]" />
+                              Reference data
+                            </span>
+                          )}
+
                           {/* Inline Flag Status Badge / Action */}
                           {status?.success ? (
                             <span className="px-3 py-1 bg-[#2DD4BF]/15 text-[#2DD4BF] border border-[#2DD4BF]/30 text-xs font-bold rounded-lg flex items-center gap-1">

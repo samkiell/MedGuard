@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHolonClient } from "@ontomorph/holon-client";
-import { checkReferenceFallback } from "@/lib/referenceInteractions";
+import { getReferenceInteraction, ENABLE_REFERENCE_FALLBACK } from "@/lib/interactionReference";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -126,8 +126,8 @@ export async function POST(req: Request) {
         const codeA = item.drugACode || conceptIdToCodeMap[cidA] || String(cidA);
         const codeB = item.drugBCode || conceptIdToCodeMap[cidB] || String(cidB);
 
-        const med1 = medications.find((m) => m.code === codeA || codeToConceptIdMap[m.code] === cidA)?.name || item.drugAName || codeA;
-        const med2 = medications.find((m) => m.code === codeB || codeToConceptIdMap[m.code] === cidB)?.name || item.drugBName || codeB;
+        const med1 = medications.find((m) => String(m.code) === codeA || codeToConceptIdMap[m.code] === cidA)?.name || item.drugAName || codeA;
+        const med2 = medications.find((m) => String(m.code) === codeB || codeToConceptIdMap[m.code] === cidB)?.name || item.drugBName || codeB;
         
         const ancestors1Obj = (conceptDetailsMap[codeA] || conceptDetailsMap[cidA])?.ancestors?.ancestors || [];
         const ancestors2Obj = (conceptDetailsMap[codeB] || conceptDetailsMap[cidB])?.ancestors?.ancestors || [];
@@ -158,31 +158,68 @@ export async function POST(req: Request) {
       });
     }
 
-    // Step 3: Reference Layer Fallback (used ONLY if HOLON returns 0 live interactions)
-    if (processedInteractions.length === 0) {
-      console.log("[API /api/interactions/check] Live HOLON checkList returned 0 interactions. Checking local reference fallback layer...");
-      const fallbackMatches = checkReferenceFallback(drugCodes);
+    // Step 3: Reference Layer Fallback (used for any pair where HOLON returned no interaction)
+    if (ENABLE_REFERENCE_FALLBACK) {
+      const holonLivePairs = new Set(
+        processedInteractions.map((item) => [String(item.pair[0]), String(item.pair[1])].sort().join("-"))
+      );
 
-      if (fallbackMatches.length > 0) {
-        console.log(`[API /api/interactions/check] Matched ${fallbackMatches.length} local reference interaction(s):`, fallbackMatches);
-        processedInteractions = fallbackMatches.map(({ pair, item }) => {
-          const med1Obj = medications.find((m) => String(m.code) === String(pair[0]));
-          const med2Obj = medications.find((m) => String(m.code) === String(pair[1]));
-          const med1Name = med1Obj?.name || item.drugAName;
-          const med2Name = med2Obj?.name || item.drugBName;
+      for (let i = 0; i < medications.length; i++) {
+        for (let j = i + 1; j < medications.length; j++) {
+          const codeA = String(medications[i].code);
+          const codeB = String(medications[j].code);
+          if (!codeA || !codeB) continue;
 
-          return {
-            pair: [pair[0], pair[1]],
-            drugNames: [med1Name, med2Name],
-            severity: item.severity,
-            description: item.clinicalEffect,
-            plainLanguageExplanation: item.explanation,
-            mechanismOrAncestors: item.ancestors || [],
-            source: "reference",
-          };
-        });
+          const pairKey = [codeA, codeB].sort().join("-");
+
+          if (!holonLivePairs.has(pairKey)) {
+            const refData = getReferenceInteraction(codeA, codeB);
+            if (refData) {
+              console.log(`[API /api/interactions/check] HOLON returned 0 interactions for pair ${pairKey}. Using reference table fallback.`);
+              const med1Name = medications[i].name || refData.drugAName;
+              const med2Name = medications[j].name || refData.drugBName;
+
+              let severity: "high" | "moderate" | "low" | "unknown" = "moderate";
+              if (refData.severity === "contraindicated" || refData.severity === "major" || refData.severity === "high") {
+                severity = "high";
+              } else if (refData.severity === "moderate") {
+                severity = "moderate";
+              } else if (refData.severity === "minor" || refData.severity === "low") {
+                severity = "low";
+              }
+
+              processedInteractions.push({
+                pair: [codeA, codeB],
+                drugNames: [med1Name, med2Name],
+                severity,
+                description: refData.clinicalEffect,
+                plainLanguageExplanation: `Taking ${med1Name} together with ${med2Name} may lead to adverse effects: ${refData.clinicalEffect}`,
+                source: "reference",
+              });
+            }
+          }
+        }
       }
     }
+
+    console.log("[HOLON Step 2 Output] Final Processed Plain-Language Interactions:", JSON.stringify(processedInteractions, null, 2));
+
+    return NextResponse.json({
+      success: true,
+      interactions: processedInteractions,
+    });
+  } catch (error: any) {
+    console.error("[API /api/interactions/check Error]:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error?.message || "Failed to perform interaction check",
+        interactions: [],
+      },
+      { status: 500 }
+    );
+  }
+}
 
     console.log("[HOLON Step 2 Output] Final Processed Plain-Language Interactions:", JSON.stringify(processedInteractions, null, 2));
 
