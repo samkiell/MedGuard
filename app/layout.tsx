@@ -1,21 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const sourceSans = Source_Sans_3({
-  variable: "--font-source-sans",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "MedGuard | Clinical Polypharmacy & Drug Safety Portal",
@@ -31,11 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${sourceSans.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-[#0F172A] text-[#F8FAFC] selection:bg-[#2DD4BF]/20 selection:text-[#2DD4BF]">
+    <html lang="en" className="h-full antialiased font-sans">
+      <body className="min-h-full flex flex-col bg-slate-950 text-slate-100 selection:bg-sky-500/20 selection:text-sky-400">
         {children}
       </body>
     </html>
