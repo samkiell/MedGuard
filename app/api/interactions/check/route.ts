@@ -160,30 +160,20 @@ export async function POST(req: Request) {
 
     // Step 3: Reference Layer Fallback (used for any pair where HOLON returned no interaction)
     if (ENABLE_REFERENCE_FALLBACK) {
-      console.log("[TRACE Step 3] Entered ENABLE_REFERENCE_FALLBACK block.");
       const holonLivePairs = new Set(
-        processedInteractions.map((item) => [String(item.pair[0]), String(item.pair[1])].sort().join("-"))
+        processedInteractions.map((item) => makePairKey(item.pair[0], item.pair[1]))
       );
-      console.log("[TRACE Step 3] holonLivePairs set:", Array.from(holonLivePairs));
 
       for (let i = 0; i < medications.length; i++) {
         for (let j = i + 1; j < medications.length; j++) {
           const codeA = String(medications[i].code);
           const codeB = String(medications[j].code);
-          console.log(`[TRACE Step 3] Evaluating pair index (${i}, ${j}): medication[${i}] code='${codeA}' (${medications[i].name}), medication[${j}] code='${codeB}' (${medications[j].name})`);
-          if (!codeA || !codeB) {
-            console.log(`[TRACE Step 3] Skipping pair index (${i}, ${j}) due to missing codeA or codeB.`);
-            continue;
-          }
+          if (!codeA || !codeB) continue;
 
-          const pairKey = [codeA, codeB].sort().join("-");
-          console.log(`[TRACE Step 3] Computed pairKey: '${pairKey}'. holonLivePairs.has('${pairKey}') = ${holonLivePairs.has(pairKey)}`);
+          const pairKey = makePairKey(codeA, codeB);
 
           if (!holonLivePairs.has(pairKey)) {
-            console.log(`[TRACE Step 3] Entering reference lookup for pairKey: '${pairKey}' (codeA='${codeA}', codeB='${codeB}')`);
             const refData = getReferenceInteraction(codeA, codeB);
-            console.log(`[TRACE Step 3] getReferenceInteraction('${codeA}', '${codeB}') returned:`, JSON.stringify(refData, null, 2));
-
             if (refData) {
               console.log(`[API /api/interactions/check] HOLON returned 0 interactions for pair ${pairKey}. Using reference table fallback.`);
               const med1Name = medications[i].name || refData.drugAName;
@@ -198,18 +188,14 @@ export async function POST(req: Request) {
                 severity = "low";
               }
 
-              const fallbackItem: PlainLanguageInteraction = {
+              processedInteractions.push({
                 pair: [codeA, codeB],
                 drugNames: [med1Name, med2Name],
                 severity,
                 description: refData.clinicalEffect,
                 plainLanguageExplanation: `Taking ${med1Name} together with ${med2Name} may lead to adverse effects: ${refData.clinicalEffect}`,
                 source: "reference",
-              };
-              console.log("[TRACE Step 3] Appending fallback interaction to processedInteractions:", JSON.stringify(fallbackItem, null, 2));
-              processedInteractions.push(fallbackItem);
-            } else {
-              console.log(`[TRACE Step 3] No match found in INTERACTION_REFERENCE_TABLE for sorted key '${pairKey}'`);
+              });
             }
           }
         }
