@@ -133,18 +133,13 @@ export default function Home() {
     }
   };
 
-  const handleAddMedication = (name: string, code: string) => {
-    const updated = [
-      ...medications,
-      {
-        id: String(Date.now()),
-        name,
-        code,
-        dosage: "Prescribed",
-      },
-    ];
+  const handleAddMedication = (medObj: Medication) => {
+    const updated = [...medications, medObj];
     setMedications(updated);
-    runInteractionCheck(updated);
+
+    // Filter to only medications that resolved to a valid code before running interaction check
+    const validMeds = updated.filter((m) => Boolean(m.code));
+    runInteractionCheck(validMeds);
   };
 
   const handleRemoveMedication = (id: string) => {
