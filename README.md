@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MedGuard 🛡️
 
-## Getting Started
+**Clinical Polypharmacy & Drug Safety Intelligence Platform** built for the **Ontomorph Hackathon**.
 
-First, run the development server:
+MedGuard dynamically connects patient Digital Twins with the **Ontomorph DTP SDK** and **HOLON Knowledge Graph API** to perform real-time, automated multi-drug interaction assessments, clinical class ancestry resolutions, and automated risk flagging.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 🌟 Key Features
+
+- **Digital Twin Integration (`@ontomorph/dtp-sdk`)**: Automatically connects to sandbox twin records to fetch active prescription regimens and sync updates.
+- **HOLON Knowledge Graph (`@ontomorph/holon-client`)**: Resolves RxNorm codes to concept IDs, extracts ontological parent/ancestor drug classes, and assesses pairwise clinical interaction severity.
+- **Fail-Safe Clinical Reference Fallback**: Guarantees system resilience with embedded reference interaction models when network connectivity or graph coverage is restricted.
+- **Digital Twin Risk Flagging**: Writes flagged interaction risks directly back into the live patient record using `twin.flag()`.
+- **Modular & High-Performance UI**: TailwindCSS design system with client-side query caching and responsive clinical feedback.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Ensure you have Node.js 18+ installed and proper environment variables configured in `.env.local`:
+
+```env
+DTP_KEY="your_dtp_api_key"
+DTP_SESSION_TOKEN="your_dtp_session_token"
+HOLON_KEY="your_holon_api_key"
+HOLON_API_URL="https://holon-api.ontomorph.com"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Install dependencies
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Run the development server
+npm run dev
+```
 
-## Learn More
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🏗️ Architecture & Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/page.tsx`: Clean main application flow rendering MedGuard components.
+- `app/api/interactions/check/route.ts`: Pairwise interaction checker powered by HOLON concepts & checkList API.
+- `app/api/interactions/explain/route.ts`: Detailed clinical breakdown API.
+- `app/api/twin/medications/route.ts`: DTP SDK route fetching twin prescription data.
+- `app/api/twin/flag/route.ts`: DTP SDK route persisting flagged interaction risks to the Digital Twin.
+- `components/`: Modular React components (`Header`, `TwinBanner`, `MedicationList`, `InteractionCard`).
+- `lib/`: Helper utilities, caching mechanisms (`helpers.ts`), token management (`dtpTokenManager.ts`), and TypeScript interfaces (`types.ts`).
