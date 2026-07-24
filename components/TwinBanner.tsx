@@ -3,10 +3,9 @@ import { Medication } from "@/lib/types";
 
 interface TwinBannerProps {
   medCount: number;
-  medications: Medication[];
 }
 
-export const TwinBanner: React.FC<TwinBannerProps> = ({ medCount, medications }) => {
+export const TwinBanner: React.FC<TwinBannerProps> = ({ medCount }) => {
   return (
     <section className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
       <div className="space-y-1">
