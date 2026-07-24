@@ -91,6 +91,15 @@ export default function Home() {
   };
 
   useEffect(() => {
+    try {
+      const savedFlags = localStorage.getItem("medguard_flagged_interactions");
+      if (savedFlags) {
+        const flaggedMap = JSON.parse(savedFlags);
+        setFlagStatus(flaggedMap);
+      }
+    } catch (e) {
+      console.warn("Failed to load flagged interactions from localStorage:", e);
+    }
     fetchMedications();
   }, []);
 
@@ -107,10 +116,18 @@ export default function Home() {
       const data = await res.json();
 
       if (data.success) {
-        setFlagStatus((prev) => ({
-          ...prev,
-          [key]: { loading: false, success: true, message: data.message },
-        }));
+        setFlagStatus((prev) => {
+          const next = {
+            ...prev,
+            [key]: { loading: false, success: true, message: data.message },
+          };
+          try {
+            localStorage.setItem("medguard_flagged_interactions", JSON.stringify(next));
+          } catch (e) {
+            console.warn("Failed to save flagged status to localStorage:", e);
+          }
+          return next;
+        });
       } else {
         setFlagStatus((prev) => ({
           ...prev,
