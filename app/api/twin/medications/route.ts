@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { DTP } from "@ontomorph/dtp-sdk";
+import { getConnectedTwin, simulateExpiredToken } from "@/lib/dtpTokenManager";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -36,25 +36,29 @@ const DEFAULT_TWIN_MEDICATIONS: MedicationEvent[] = [
   },
 ];
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const grantToken = process.env.DTP_GRANT_TOKEN;
     const apiKey = process.env.DTP_KEY;
-    
+    const url = new URL(req.url);
+    const forceExpired = url.searchParams.get("simulateExpired") === "true";
+
+    if (forceExpired) {
+      simulateExpiredToken();
+    }
+
     let rawEvents: any[] = [];
-    if (grantToken && apiKey) {
+    if (apiKey) {
       try {
-        const dtp = new DTP({ apiKey });
-        const twin = dtp.twins.connect(grantToken);
-        console.log("[Digital Twin Connected ID]:", (twin as any).id || (twin as any).twinId || grantToken);
-        
+        const { twin, twinId } = await getConnectedTwin();
+        console.log("[Digital Twin Connected ID]:", twinId || (twin as any).id);
+
         rawEvents = await twin.events.list();
         console.log("[Digital Twin Raw Events List]:", JSON.stringify(rawEvents, null, 2));
       } catch (eventsErr: any) {
         console.warn("[Digital Twin Raw Events Fetch Warning]:", eventsErr?.message || eventsErr);
       }
     } else {
-      console.warn("[Digital Twin Credentials Missing]: Using sandbox twin fallback profile.");
+      console.warn("[Digital Twin Credentials Missing]: DTP_KEY not configured.");
     }
 
     // Filter medication events

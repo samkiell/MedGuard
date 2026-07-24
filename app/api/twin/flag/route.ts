@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { DTP } from "@ontomorph/dtp-sdk";
+import { getConnectedTwin } from "@/lib/dtpTokenManager";
 
 export async function POST(req: Request) {
   try {
-    const grantToken = process.env.DTP_GRANT_TOKEN;
     const body = await req.json();
     const { interaction } = body; // { drugNames, severity, plainLanguageExplanation, pair }
 
@@ -15,10 +14,9 @@ export async function POST(req: Request) {
     }
 
     const apiKey = process.env.DTP_KEY;
-    if (grantToken && apiKey) {
+    if (apiKey) {
       try {
-        const dtp = new DTP({ apiKey });
-        const twin = dtp.twins.connect(grantToken);
+        const { twin } = await getConnectedTwin();
 
         // Write flag back to the twin
         await twin.flag("pharmacology", {
