@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHolonClient } from "@ontomorph/holon-client";
-import { getReferenceInteraction, ENABLE_REFERENCE_FALLBACK } from "@/lib/interactionReference";
+import { getReferenceInteraction, ENABLE_REFERENCE_FALLBACK, makePairKey } from "@/lib/interactionReference";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
