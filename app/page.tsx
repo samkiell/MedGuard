@@ -168,7 +168,7 @@ export default function Home() {
           </div>
         )}
 
-        <TwinBanner medCount={medications.length} medications={medications} />
+        <TwinBanner medCount={medications.length} />
 
         <MedicationList
           medications={medications}
