@@ -1,5 +1,5 @@
 import React from "react";
-import { PlainLanguageInteraction, FlagStatusMap } from "@/lib/types";
+import { PlainLanguageInteraction } from "@/lib/types";
 import { getSeverityTier } from "@/lib/helpers";
 
 interface InteractionCardProps {
