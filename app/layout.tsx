@@ -20,6 +20,9 @@ const sourceSans = Source_Sans_3({
 export const metadata: Metadata = {
   title: "MedGuard | Clinical Polypharmacy & Drug Safety Portal",
   description: "Clinical drug-safety and interaction monitoring tool powered by Ontomorph Digital Twins.",
+  icons: {
+    icon: "/assets/favicon.ico",
+  },
 };
 
 export default function RootLayout({
