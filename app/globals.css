@@ -23,9 +23,11 @@ body {
   font-family: var(--font-sans-manrope);
 }
 
-/* Elegant Editorial Headings */
-h1, h2, h3, .font-serif, .font-editorial {
+/* Editorial headings — opt-in via .font-editorial */
+.font-editorial {
   font-family: var(--font-serif-cormorant);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 /* Technical Code & RxNorm Identifiers */
@@ -37,4 +39,9 @@ code, pre, .font-mono {
 *:focus-visible {
   outline: 2px solid #38BDF8;
   outline-offset: 2px;
+}
+
+/* Smooth scroll anchor offset for sticky header */
+[data-section] {
+  scroll-margin-top: 72px;
 }
