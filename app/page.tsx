@@ -156,7 +156,7 @@ export default function Home() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased pb-16">
       <Header onSync={fetchMedications} isSyncing={loadingMeds} />
 
-      <main className="max-w-5xl mx-auto px-6 pt-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-6 pt-8 space-y-8">
         {error && (
           <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
             ⚠️ {error}
@@ -173,16 +173,20 @@ export default function Home() {
         />
 
         {/* Interaction Results Section */}
-        <section className="space-y-4">
+        <section className="space-y-4" data-section="interactions">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-semibold text-slate-100">Interaction & Polypharmacy Analysis</h3>
+              <h3 className="text-base font-semibold text-slate-100">Interaction &amp; Polypharmacy Analysis</h3>
               <p className="text-xs text-slate-400">
-                Automated pairwise evaluation across active regimen via HOLON & Reference fallback.
+                Automated pairwise evaluation across active regimen via HOLON &amp; Reference fallback.
               </p>
             </div>
             {checkingInteractions && (
-              <span className="text-xs text-blue-400 flex items-center gap-1.5 animate-pulse">
+              <span className="text-xs text-blue-400 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
                 Analyzing Rx Pairs...
               </span>
             )}
@@ -190,11 +194,19 @@ export default function Home() {
 
           {checkingInteractions && interactions.length === 0 ? (
             <div className="py-12 text-center text-xs text-slate-400 bg-slate-900/40 rounded-xl border border-slate-800">
+              <svg className="w-5 h-5 animate-spin mx-auto mb-3 text-blue-400" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
               Running interaction pipeline across Digital Twin medications...
+            </div>
+          ) : medications.length < 2 ? (
+            <div className="py-12 text-center text-xs text-slate-400 bg-slate-900/40 rounded-xl border border-slate-800 border-dashed">
+              Add at least 2 medications to run interaction analysis.
             </div>
           ) : interactions.length === 0 ? (
             <div className="py-12 text-center text-xs text-slate-400 bg-slate-900/40 rounded-xl border border-slate-800">
-              No clinical interactions detected for current regimen configuration.
+              ✓ No clinical interactions detected for the current regimen.
             </div>
           ) : (
             <div className="space-y-3">
